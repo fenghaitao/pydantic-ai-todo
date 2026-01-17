@@ -19,6 +19,8 @@ Example:
     ```
 """
 
+from importlib.metadata import version
+
 from pydantic_ai_todo.storage import TodoStorage, TodoStorageProtocol
 from pydantic_ai_todo.toolset import (
     READ_TODO_DESCRIPTION,
@@ -45,4 +47,4 @@ __all__ = [
     "READ_TODO_DESCRIPTION",
 ]
 
-__version__ = "0.1.0"
+__version__ = version("pydantic-ai-todo")

@@ -1,11 +1,11 @@
 [project]
 name = "pydantic-ai-todo"
-version = "0.1.1"
+version = "0.1.2"
 description = "Todo/task planning toolset for pydantic-ai agents"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-authors = [{ name = "VStorm", email = "hello@vstorm.co" }]
+authors = [{ name = "Vstorm", email = "hr@vstorm.co" }]
 keywords = ["pydantic", "pydantic-ai", "ai", "agents", "todo", "task-management", "toolset"]
 classifiers = [
     "Development Status :: 4 - Beta",
