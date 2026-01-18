@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic_ai.toolsets import FunctionToolset
 
-from pydantic_ai_todo.storage import TodoStorage, TodoStorageProtocol
+from pydantic_ai_todo.storage import (
+    AsyncTodoStorageProtocol,
+    TodoStorage,
+    TodoStorageProtocol,
+)
 from pydantic_ai_todo.types import Todo, TodoItem
 
 TODO_TOOL_DESCRIPTION = """
@@ -85,6 +89,7 @@ Returns confirmation or error if the todo is not found.
 def create_todo_toolset(
     storage: TodoStorageProtocol | None = None,
     *,
+    async_storage: AsyncTodoStorageProtocol | None = None,
     id: str | None = None,
 ) -> FunctionToolset[Any]:
     """Create a todo toolset for task management.
@@ -93,9 +98,11 @@ def create_todo_toolset(
     to track and manage tasks during a session.
 
     Args:
-        storage: Optional storage backend. Defaults to in-memory TodoStorage.
-            You can provide a custom storage implementing TodoStorageProtocol
-            for persistence or integration with other systems.
+        storage: Optional sync storage backend. Defaults to in-memory TodoStorage.
+            You can provide a custom storage implementing TodoStorageProtocol.
+            Ignored if async_storage is provided.
+        async_storage: Optional async storage backend implementing AsyncTodoStorageProtocol.
+            When provided, all operations use async methods for true persistence.
         id: Optional unique ID for the toolset.
 
     Returns:
@@ -110,7 +117,7 @@ def create_todo_toolset(
         result = await agent.run("Create a todo list for my project")
         ```
 
-    Example (with custom storage):
+    Example (with sync storage):
         ```python
         from pydantic_ai_todo import create_todo_toolset, TodoStorage
 
@@ -120,7 +127,31 @@ def create_todo_toolset(
         # After agent runs, access todos directly
         print(storage.todos)
         ```
+
+    Example (with async storage):
+        ```python
+        from pydantic_ai_todo import create_todo_toolset, AsyncMemoryStorage
+
+        storage = AsyncMemoryStorage()
+        toolset = create_todo_toolset(async_storage=storage)
+
+        # After agent runs, access todos
+        todos = await storage.get_todos()
+        ```
     """
+    # Use async storage if provided, otherwise fall back to sync storage
+    if async_storage is not None:
+        return _create_async_toolset(async_storage, id=id)
+    else:
+        return _create_sync_toolset(storage, id=id)
+
+
+def _create_sync_toolset(
+    storage: TodoStorageProtocol | None = None,
+    *,
+    id: str | None = None,
+) -> FunctionToolset[Any]:
+    """Create toolset with sync storage (backwards compatible)."""
     _storage = storage if storage is not None else TodoStorage()
 
     toolset: FunctionToolset[Any] = FunctionToolset(id=id)
@@ -242,14 +273,139 @@ def create_todo_toolset(
     return toolset
 
 
+def _create_async_toolset(
+    storage: AsyncTodoStorageProtocol,
+    *,
+    id: str | None = None,
+) -> FunctionToolset[Any]:
+    """Create toolset with async storage for true persistence."""
+    toolset: FunctionToolset[Any] = FunctionToolset(id=id)
+
+    @toolset.tool(description=READ_TODO_DESCRIPTION)
+    async def read_todos() -> str:
+        """Read the current todo list."""
+        todos = await storage.get_todos()
+        if not todos:
+            return "No todos in the list. Use write_todos to create tasks."
+
+        lines = ["Current todos:"]
+        for i, todo in enumerate(todos, 1):
+            status_icon = {
+                "pending": "[ ]",
+                "in_progress": "[*]",
+                "completed": "[x]",
+            }.get(todo.status, "[ ]")
+            lines.append(f"{i}. {status_icon} [{todo.id}] {todo.content}")
+
+        # Add summary
+        counts = {"pending": 0, "in_progress": 0, "completed": 0}
+        for todo in todos:
+            counts[todo.status] += 1
+
+        lines.append("")
+        lines.append(
+            f"Summary: {counts['completed']} completed, "
+            f"{counts['in_progress']} in progress, "
+            f"{counts['pending']} pending"
+        )
+
+        return "\n".join(lines)
+
+    @toolset.tool(description=TODO_TOOL_DESCRIPTION)
+    async def write_todos(todos: list[TodoItem]) -> str:
+        """Update the todo list with new items.
+
+        Args:
+            todos: List of todo items with content, status, and active_form.
+        """
+        new_todos: list[Todo] = []
+        for t in todos:
+            if t.id is not None:
+                new_todos.append(
+                    Todo(id=t.id, content=t.content, status=t.status, active_form=t.active_form)
+                )
+            else:
+                new_todos.append(
+                    Todo(content=t.content, status=t.status, active_form=t.active_form)
+                )
+        await storage.set_todos(new_todos)
+
+        # Count by status
+        counts = {"pending": 0, "in_progress": 0, "completed": 0}
+        for todo in new_todos:
+            counts[todo.status] += 1
+
+        return (
+            f"Updated {len(todos)} todos: "
+            f"{counts['completed']} completed, "
+            f"{counts['in_progress']} in progress, "
+            f"{counts['pending']} pending"
+        )
+
+    @toolset.tool(description=ADD_TODO_DESCRIPTION)
+    async def add_todo(content: str, active_form: str) -> str:
+        """Add a new todo item to the list.
+
+        Args:
+            content: The task description in imperative form.
+            active_form: Present continuous form shown during execution.
+
+        Returns:
+            Confirmation message with the new todo's ID.
+        """
+        new_todo = Todo(content=content, status="pending", active_form=active_form)
+        await storage.add_todo(new_todo)
+        return f"Added todo '{content}' with ID: {new_todo.id}"
+
+    @toolset.tool(description=UPDATE_TODO_STATUS_DESCRIPTION)
+    async def update_todo_status(
+        todo_id: str, status: Literal["pending", "in_progress", "completed"]
+    ) -> str:
+        """Update the status of an existing todo.
+
+        Args:
+            todo_id: The ID of the todo to update.
+            status: New status (pending, in_progress, or completed).
+
+        Returns:
+            Confirmation message or error if not found.
+        """
+        updated = await storage.update_todo(todo_id, status=status)
+        if updated:
+            return f"Updated todo '{updated.content}' status to '{status}'"
+        return f"Todo with ID '{todo_id}' not found"
+
+    @toolset.tool(description=REMOVE_TODO_DESCRIPTION)
+    async def remove_todo(todo_id: str) -> str:
+        """Remove a todo from the list.
+
+        Args:
+            todo_id: The ID of the todo to remove.
+
+        Returns:
+            Confirmation message or error if not found.
+        """
+        # Get todo content before removing for the message
+        todo = await storage.get_todo(todo_id)
+        if todo:
+            await storage.remove_todo(todo_id)
+            return f"Removed todo '{todo.content}' (ID: {todo_id})"
+        return f"Todo with ID '{todo_id}' not found"
+
+    return toolset
+
+
 def get_todo_system_prompt(storage: TodoStorageProtocol | None = None) -> str:
     """Generate dynamic system prompt section for todos.
 
     Args:
-        storage: Optional storage to read current todos from.
+        storage: Optional sync storage to read current todos from.
 
     Returns:
         System prompt section with current todos, or base prompt if no todos.
+
+    Note:
+        For async storage, use get_todo_system_prompt_async instead.
     """
     if storage is None or not storage.todos:
         return TODO_SYSTEM_PROMPT
@@ -257,6 +413,37 @@ def get_todo_system_prompt(storage: TodoStorageProtocol | None = None) -> str:
     lines = [TODO_SYSTEM_PROMPT, "", "## Current Todos"]
 
     for todo in storage.todos:
+        status_icon = {
+            "pending": "[ ]",
+            "in_progress": "[*]",
+            "completed": "[x]",
+        }.get(todo.status, "[ ]")
+        lines.append(f"- {status_icon} {todo.content}")
+
+    return "\n".join(lines)
+
+
+async def get_todo_system_prompt_async(
+    storage: AsyncTodoStorageProtocol | None = None,
+) -> str:
+    """Generate dynamic system prompt section for todos (async version).
+
+    Args:
+        storage: Optional async storage to read current todos from.
+
+    Returns:
+        System prompt section with current todos, or base prompt if no todos.
+    """
+    if storage is None:
+        return TODO_SYSTEM_PROMPT
+
+    todos = await storage.get_todos()
+    if not todos:
+        return TODO_SYSTEM_PROMPT
+
+    lines = [TODO_SYSTEM_PROMPT, "", "## Current Todos"]
+
+    for todo in todos:
         status_icon = {
             "pending": "[ ]",
             "in_progress": "[*]",

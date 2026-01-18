@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 from pydantic_ai_todo.types import Todo
 
@@ -72,3 +72,157 @@ class TodoStorage:
     def todos(self, value: list[Todo]) -> None:
         """Set the list of todos."""
         self._todos = value
+
+
+class AsyncTodoStorageProtocol(Protocol):
+    """Protocol for async todo storage implementations.
+
+    This protocol defines the interface for async storage backends
+    that support true persistence (database, file, etc.).
+
+    Example:
+        ```python
+        class MyAsyncStorage:
+            async def get_todos(self) -> list[Todo]:
+                return await db.fetch_todos()
+
+            async def set_todos(self, todos: list[Todo]) -> None:
+                await db.save_todos(todos)
+
+            async def get_todo(self, id: str) -> Todo | None:
+                return await db.get_todo(id)
+
+            async def add_todo(self, todo: Todo) -> Todo:
+                return await db.insert_todo(todo)
+
+            async def update_todo(self, id: str, **fields) -> Todo | None:
+                return await db.update_todo(id, fields)
+
+            async def remove_todo(self, id: str) -> bool:
+                return await db.delete_todo(id)
+        ```
+    """
+
+    async def get_todos(self) -> list[Todo]:
+        """Get all todos."""
+        ...
+
+    async def set_todos(self, todos: list[Todo]) -> None:
+        """Replace all todos with the provided list."""
+        ...
+
+    async def get_todo(self, id: str) -> Todo | None:
+        """Get a single todo by ID."""
+        ...
+
+    async def add_todo(self, todo: Todo) -> Todo:
+        """Add a new todo and return it."""
+        ...
+
+    async def update_todo(
+        self,
+        id: str,
+        *,
+        content: str | None = None,
+        status: Literal["pending", "in_progress", "completed"] | None = None,
+        active_form: str | None = None,
+    ) -> Todo | None:
+        """Update a todo's fields by ID. Returns None if not found."""
+        ...
+
+    async def remove_todo(self, id: str) -> bool:
+        """Remove a todo by ID. Returns True if removed, False if not found."""
+        ...
+
+
+class AsyncMemoryStorage:
+    """Async in-memory todo storage.
+
+    Implements AsyncTodoStorageProtocol for testing and simple use cases.
+    Data is stored in memory and lost when the process ends.
+
+    Example:
+        ```python
+        from pydantic_ai_todo import AsyncMemoryStorage, create_todo_toolset
+
+        storage = AsyncMemoryStorage()
+        toolset = create_todo_toolset(async_storage=storage)
+
+        # After agent runs, access todos
+        todos = await storage.get_todos()
+        ```
+    """
+
+    def __init__(self) -> None:
+        self._todos: list[Todo] = []
+
+    async def get_todos(self) -> list[Todo]:
+        """Get all todos."""
+        return list(self._todos)
+
+    async def set_todos(self, todos: list[Todo]) -> None:
+        """Replace all todos with the provided list."""
+        self._todos = list(todos)
+
+    async def get_todo(self, id: str) -> Todo | None:
+        """Get a single todo by ID."""
+        for todo in self._todos:
+            if todo.id == id:
+                return todo
+        return None
+
+    async def add_todo(self, todo: Todo) -> Todo:
+        """Add a new todo and return it."""
+        self._todos.append(todo)
+        return todo
+
+    async def update_todo(
+        self,
+        id: str,
+        *,
+        content: str | None = None,
+        status: Literal["pending", "in_progress", "completed"] | None = None,
+        active_form: str | None = None,
+    ) -> Todo | None:
+        """Update a todo's fields by ID. Returns None if not found."""
+        for todo in self._todos:
+            if todo.id == id:
+                if content is not None:
+                    todo.content = content
+                if status is not None:
+                    todo.status = status
+                if active_form is not None:
+                    todo.active_form = active_form
+                return todo
+        return None
+
+    async def remove_todo(self, id: str) -> bool:
+        """Remove a todo by ID. Returns True if removed, False if not found."""
+        for i, todo in enumerate(self._todos):
+            if todo.id == id:
+                self._todos.pop(i)
+                return True
+        return False
+
+
+def create_storage(backend: Literal["memory"] = "memory") -> AsyncMemoryStorage:
+    """Factory function to create storage backends.
+
+    Args:
+        backend: The storage backend to use. Currently only "memory" is supported.
+
+    Returns:
+        An async storage instance.
+
+    Example:
+        ```python
+        from pydantic_ai_todo import create_storage
+
+        storage = create_storage("memory")
+        toolset = create_todo_toolset(async_storage=storage)
+        ```
+    """
+    if backend == "memory":
+        return AsyncMemoryStorage()
+    # This line is unreachable due to Literal type, but keeps future extensibility clear
+    raise ValueError(f"Unknown storage backend: {backend}")  # pragma: no cover

@@ -6,11 +6,13 @@ import pytest
 from pydantic_ai.toolsets import FunctionToolset
 
 from pydantic_ai_todo import (
+    AsyncMemoryStorage,
     Todo,
     TodoItem,
     TodoStorage,
     create_todo_toolset,
     get_todo_system_prompt,
+    get_todo_system_prompt_async,
 )
 
 
@@ -452,3 +454,179 @@ class TestRemoveTodo:
         result = await remove_todo.function(todo_id="nonexistent")  # type: ignore[call-arg]
 
         assert "not found" in result
+
+
+class TestAsyncStorageToolset:
+    """Tests for toolset with async storage."""
+
+    @pytest.fixture
+    def storage(self) -> AsyncMemoryStorage:
+        """Create an async storage instance."""
+        return AsyncMemoryStorage()
+
+    @pytest.fixture
+    def toolset(self, storage: AsyncMemoryStorage) -> FunctionToolset[Any]:
+        """Create a toolset with async storage."""
+        return create_todo_toolset(async_storage=storage)
+
+    def test_returns_function_toolset(self, toolset: FunctionToolset[Any]) -> None:
+        """Test that factory returns a FunctionToolset."""
+        assert isinstance(toolset, FunctionToolset)
+
+    def test_toolset_has_all_tools(self, toolset: FunctionToolset[Any]) -> None:
+        """Test that toolset has all expected tools."""
+        assert "read_todos" in toolset.tools
+        assert "write_todos" in toolset.tools
+        assert "add_todo" in toolset.tools
+        assert "update_todo_status" in toolset.tools
+        assert "remove_todo" in toolset.tools
+
+    async def test_read_empty_todos(self, toolset: FunctionToolset[Any]) -> None:
+        """Test reading when no todos exist."""
+        read_todos = toolset.tools["read_todos"]
+        result = await read_todos.function()  # type: ignore[call-arg]
+        assert "No todos" in result
+
+    async def test_write_and_read_todos(
+        self, storage: AsyncMemoryStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test writing and reading todos with async storage."""
+        write_todos = toolset.tools["write_todos"]
+        items = [
+            TodoItem(content="Task 1", status="pending", active_form="Working on Task 1"),
+            TodoItem(content="Task 2", status="in_progress", active_form="Working on Task 2"),
+        ]
+        await write_todos.function(todos=items)  # type: ignore[call-arg]
+
+        # Verify in storage
+        todos = await storage.get_todos()
+        assert len(todos) == 2
+        assert todos[0].content == "Task 1"
+        assert todos[1].status == "in_progress"
+
+        # Verify via read
+        read_todos = toolset.tools["read_todos"]
+        result = await read_todos.function()  # type: ignore[call-arg]
+        assert "Task 1" in result
+        assert "Task 2" in result
+
+    async def test_add_todo(
+        self, storage: AsyncMemoryStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test adding a todo with async storage."""
+        add_todo = toolset.tools["add_todo"]
+        result = await add_todo.function(content="New task", active_form="Working")  # type: ignore[call-arg]
+
+        assert "Added todo" in result
+        todos = await storage.get_todos()
+        assert len(todos) == 1
+        assert todos[0].content == "New task"
+
+    async def test_update_todo_status(
+        self, storage: AsyncMemoryStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test updating todo status with async storage."""
+        # Add a todo first
+        todo = Todo(id="test123", content="Task", status="pending", active_form="Working")
+        await storage.add_todo(todo)
+
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="test123", status="completed")  # type: ignore[call-arg]
+
+        assert "Updated todo" in result
+        updated = await storage.get_todo("test123")
+        assert updated is not None
+        assert updated.status == "completed"
+
+    async def test_update_todo_status_not_found(self, toolset: FunctionToolset[Any]) -> None:
+        """Test updating non-existent todo."""
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="nonexistent", status="completed")  # type: ignore[call-arg]
+
+        assert "not found" in result
+
+    async def test_remove_todo(
+        self, storage: AsyncMemoryStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test removing a todo with async storage."""
+        # Add a todo first
+        todo = Todo(id="test123", content="Task to remove", status="pending", active_form="Working")
+        await storage.add_todo(todo)
+
+        remove_todo = toolset.tools["remove_todo"]
+        result = await remove_todo.function(todo_id="test123")  # type: ignore[call-arg]
+
+        assert "Removed todo" in result
+        assert "test123" in result
+
+        todos = await storage.get_todos()
+        assert len(todos) == 0
+
+    async def test_remove_todo_not_found(self, toolset: FunctionToolset[Any]) -> None:
+        """Test removing non-existent todo."""
+        remove_todo = toolset.tools["remove_todo"]
+        result = await remove_todo.function(todo_id="nonexistent")  # type: ignore[call-arg]
+
+        assert "not found" in result
+
+    async def test_write_todos_with_custom_id(
+        self, storage: AsyncMemoryStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test writing todos with custom IDs preserves them (async)."""
+        write_todos = toolset.tools["write_todos"]
+        items = [
+            TodoItem(id="custom1", content="Task 1", status="pending", active_form="Working"),
+            TodoItem(id="custom2", content="Task 2", status="pending", active_form="Working"),
+        ]
+        await write_todos.function(todos=items)  # type: ignore[call-arg]
+
+        todos = await storage.get_todos()
+        assert len(todos) == 2
+        assert todos[0].id == "custom1"
+        assert todos[1].id == "custom2"
+
+
+class TestGetTodoSystemPromptAsync:
+    """Tests for get_todo_system_prompt_async function."""
+
+    async def test_prompt_without_storage(self) -> None:
+        """Test system prompt without storage."""
+        prompt = await get_todo_system_prompt_async()
+        assert "Task Management" in prompt
+        assert "write_todos" in prompt
+
+    async def test_prompt_with_empty_storage(self) -> None:
+        """Test system prompt with empty storage."""
+        storage = AsyncMemoryStorage()
+        prompt = await get_todo_system_prompt_async(storage)
+        assert "Task Management" in prompt
+        assert "Current Todos" not in prompt
+
+    async def test_prompt_with_todos(self) -> None:
+        """Test system prompt includes current todos."""
+        storage = AsyncMemoryStorage()
+        await storage.add_todo(Todo(content="Task 1", status="pending", active_form="Working"))
+        await storage.add_todo(Todo(content="Task 2", status="in_progress", active_form="Working"))
+
+        prompt = await get_todo_system_prompt_async(storage)
+
+        assert "Current Todos" in prompt
+        assert "Task 1" in prompt
+        assert "Task 2" in prompt
+        assert "[ ]" in prompt  # pending
+        assert "[*]" in prompt  # in_progress
+
+    async def test_prompt_todos_status_icons(self) -> None:
+        """Test that prompt shows correct status icons."""
+        storage = AsyncMemoryStorage()
+        await storage.add_todo(Todo(content="Pending", status="pending", active_form="Working"))
+        await storage.add_todo(
+            Todo(content="In Progress", status="in_progress", active_form="Working")
+        )
+        await storage.add_todo(Todo(content="Completed", status="completed", active_form="Working"))
+
+        prompt = await get_todo_system_prompt_async(storage)
+
+        assert "[ ] Pending" in prompt
+        assert "[*] In Progress" in prompt
+        assert "[x] Completed" in prompt
