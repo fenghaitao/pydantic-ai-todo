@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 from pydantic_ai_todo.types import Todo
+
+if TYPE_CHECKING:
+    from pydantic_ai_todo.events import TodoEventEmitter
 
 
 @runtime_checkable
@@ -153,10 +156,24 @@ class AsyncMemoryStorage:
         # After agent runs, access todos
         todos = await storage.get_todos()
         ```
+
+    With event emitter:
+        ```python
+        from pydantic_ai_todo import AsyncMemoryStorage, TodoEventEmitter
+
+        emitter = TodoEventEmitter()
+
+        @emitter.on_created
+        async def notify(event):
+            print(f"Created: {event.todo.content}")
+
+        storage = AsyncMemoryStorage(event_emitter=emitter)
+        ```
     """
 
-    def __init__(self) -> None:
+    def __init__(self, event_emitter: TodoEventEmitter | None = None) -> None:
         self._todos: list[Todo] = []
+        self._event_emitter = event_emitter
 
     async def get_todos(self) -> list[Todo]:
         """Get all todos."""
@@ -176,6 +193,10 @@ class AsyncMemoryStorage:
     async def add_todo(self, todo: Todo) -> Todo:
         """Add a new todo and return it."""
         self._todos.append(todo)
+        if self._event_emitter:
+            from pydantic_ai_todo.events import TodoEvent, TodoEventType
+
+            await self._event_emitter.emit(TodoEvent(event_type=TodoEventType.CREATED, todo=todo))
         return todo
 
     async def update_todo(
@@ -191,6 +212,10 @@ class AsyncMemoryStorage:
         """Update a todo's fields by ID. Returns None if not found."""
         for todo in self._todos:
             if todo.id == id:
+                # Capture previous state for events
+                previous_state = todo.model_copy() if self._event_emitter else None
+                old_status = todo.status
+
                 if content is not None:
                     todo.content = content
                 if status is not None:
@@ -201,6 +226,40 @@ class AsyncMemoryStorage:
                     todo.parent_id = parent_id
                 if depends_on is not None:
                     todo.depends_on = depends_on
+
+                # Emit events
+                if self._event_emitter:
+                    from pydantic_ai_todo.events import TodoEvent, TodoEventType
+
+                    # Always emit UPDATED
+                    await self._event_emitter.emit(
+                        TodoEvent(
+                            event_type=TodoEventType.UPDATED,
+                            todo=todo,
+                            previous_state=previous_state,
+                        )
+                    )
+
+                    # Emit STATUS_CHANGED if status changed
+                    if status is not None and status != old_status:
+                        await self._event_emitter.emit(
+                            TodoEvent(
+                                event_type=TodoEventType.STATUS_CHANGED,
+                                todo=todo,
+                                previous_state=previous_state,
+                            )
+                        )
+
+                        # Emit COMPLETED if newly completed
+                        if status == "completed":
+                            await self._event_emitter.emit(
+                                TodoEvent(
+                                    event_type=TodoEventType.COMPLETED,
+                                    todo=todo,
+                                    previous_state=previous_state,
+                                )
+                            )
+
                 return todo
         return None
 
@@ -208,16 +267,26 @@ class AsyncMemoryStorage:
         """Remove a todo by ID. Returns True if removed, False if not found."""
         for i, todo in enumerate(self._todos):
             if todo.id == id:
-                self._todos.pop(i)
+                removed_todo = self._todos.pop(i)
+                if self._event_emitter:
+                    from pydantic_ai_todo.events import TodoEvent, TodoEventType
+
+                    await self._event_emitter.emit(
+                        TodoEvent(event_type=TodoEventType.DELETED, todo=removed_todo)
+                    )
                 return True
         return False
 
 
-def create_storage(backend: Literal["memory"] = "memory") -> AsyncMemoryStorage:
+def create_storage(
+    backend: Literal["memory"] = "memory",
+    event_emitter: TodoEventEmitter | None = None,
+) -> AsyncMemoryStorage:
     """Factory function to create storage backends.
 
     Args:
         backend: The storage backend to use. Currently only "memory" is supported.
+        event_emitter: Optional event emitter to receive CRUD events.
 
     Returns:
         An async storage instance.
@@ -229,8 +298,16 @@ def create_storage(backend: Literal["memory"] = "memory") -> AsyncMemoryStorage:
         storage = create_storage("memory")
         toolset = create_todo_toolset(async_storage=storage)
         ```
+
+    With events:
+        ```python
+        from pydantic_ai_todo import create_storage, TodoEventEmitter
+
+        emitter = TodoEventEmitter()
+        storage = create_storage("memory", event_emitter=emitter)
+        ```
     """
     if backend == "memory":
-        return AsyncMemoryStorage()
+        return AsyncMemoryStorage(event_emitter=event_emitter)
     # This line is unreachable due to Literal type, but keeps future extensibility clear
     raise ValueError(f"Unknown storage backend: {backend}")  # pragma: no cover

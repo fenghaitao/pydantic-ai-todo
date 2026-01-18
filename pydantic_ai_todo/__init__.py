@@ -21,6 +21,7 @@ Example:
 
 from importlib.metadata import version
 
+from pydantic_ai_todo.events import TodoEvent, TodoEventEmitter, TodoEventType
 from pydantic_ai_todo.storage import (
     AsyncMemoryStorage,
     AsyncTodoStorageProtocol,
@@ -57,6 +58,10 @@ __all__ = [
     "AsyncMemoryStorage",
     "AsyncTodoStorageProtocol",
     "create_storage",
+    # Events
+    "TodoEvent",
+    "TodoEventType",
+    "TodoEventEmitter",
     # Constants (for customization)
     "TODO_TOOL_DESCRIPTION",
     "TODO_SYSTEM_PROMPT",
