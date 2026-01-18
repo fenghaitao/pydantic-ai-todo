@@ -24,6 +24,7 @@ from importlib.metadata import version
 from pydantic_ai_todo.events import TodoEvent, TodoEventEmitter, TodoEventType
 from pydantic_ai_todo.storage import (
     AsyncMemoryStorage,
+    AsyncPostgresStorage,
     AsyncTodoStorageProtocol,
     TodoStorage,
     TodoStorageProtocol,
@@ -56,6 +57,7 @@ __all__ = [
     "TodoStorageProtocol",
     # Async storage
     "AsyncMemoryStorage",
+    "AsyncPostgresStorage",
     "AsyncTodoStorageProtocol",
     "create_storage",
     # Events

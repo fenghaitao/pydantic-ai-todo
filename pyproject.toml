@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
-dependencies = ["pydantic-ai>=0.1.0", "pydantic>=2.0"]
+dependencies = ["pydantic-ai>=0.1.0", "pydantic>=2.0", "asyncpg>=0.29.0"]
 
 [project.urls]
 Homepage = "https://github.com/vstorm-co/pydantic-ai-todo"
@@ -70,3 +70,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 pythonVersion = "3.10"
 typeCheckingMode = "strict"
 reportUnusedFunction = false
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
