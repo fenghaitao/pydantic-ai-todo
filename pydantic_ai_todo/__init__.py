@@ -29,7 +29,11 @@ from pydantic_ai_todo.storage import (
     create_storage,
 )
 from pydantic_ai_todo.toolset import (
+    ADD_SUBTASK_DESCRIPTION,
+    ADD_TODO_DESCRIPTION,
+    GET_AVAILABLE_TASKS_DESCRIPTION,
     READ_TODO_DESCRIPTION,
+    SET_DEPENDENCY_DESCRIPTION,
     TODO_SYSTEM_PROMPT,
     TODO_TOOL_DESCRIPTION,
     create_todo_toolset,
@@ -57,6 +61,10 @@ __all__ = [
     "TODO_TOOL_DESCRIPTION",
     "TODO_SYSTEM_PROMPT",
     "READ_TODO_DESCRIPTION",
+    "ADD_TODO_DESCRIPTION",
+    "ADD_SUBTASK_DESCRIPTION",
+    "SET_DEPENDENCY_DESCRIPTION",
+    "GET_AVAILABLE_TASKS_DESCRIPTION",
 ]
 
 __version__ = version("pydantic-ai-todo")

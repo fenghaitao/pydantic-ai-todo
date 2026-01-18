@@ -124,8 +124,10 @@ class AsyncTodoStorageProtocol(Protocol):
         id: str,
         *,
         content: str | None = None,
-        status: Literal["pending", "in_progress", "completed"] | None = None,
+        status: Literal["pending", "in_progress", "completed", "blocked"] | None = None,
         active_form: str | None = None,
+        parent_id: str | None = None,
+        depends_on: list[str] | None = None,
     ) -> Todo | None:
         """Update a todo's fields by ID. Returns None if not found."""
         ...
@@ -181,8 +183,10 @@ class AsyncMemoryStorage:
         id: str,
         *,
         content: str | None = None,
-        status: Literal["pending", "in_progress", "completed"] | None = None,
+        status: Literal["pending", "in_progress", "completed", "blocked"] | None = None,
         active_form: str | None = None,
+        parent_id: str | None = None,
+        depends_on: list[str] | None = None,
     ) -> Todo | None:
         """Update a todo's fields by ID. Returns None if not found."""
         for todo in self._todos:
@@ -193,6 +197,10 @@ class AsyncMemoryStorage:
                     todo.status = status
                 if active_form is not None:
                     todo.active_form = active_form
+                if parent_id is not None:
+                    todo.parent_id = parent_id
+                if depends_on is not None:
+                    todo.depends_on = depends_on
                 return todo
         return None
 

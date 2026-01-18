@@ -215,6 +215,26 @@ class TestAsyncMemoryStorage:
         assert result.status == "completed"
         assert result.active_form == "New form"
 
+    async def test_update_todo_parent_id(self) -> None:
+        """Test updating a todo's parent_id."""
+        storage = AsyncMemoryStorage()
+        todo = Todo(id="test123", content="Task", status="pending", active_form="Working")
+        await storage.add_todo(todo)
+
+        result = await storage.update_todo("test123", parent_id="parent1")
+        assert result is not None
+        assert result.parent_id == "parent1"
+
+    async def test_update_todo_depends_on(self) -> None:
+        """Test updating a todo's depends_on list."""
+        storage = AsyncMemoryStorage()
+        todo = Todo(id="test123", content="Task", status="pending", active_form="Working")
+        await storage.add_todo(todo)
+
+        result = await storage.update_todo("test123", depends_on=["dep1", "dep2"])
+        assert result is not None
+        assert result.depends_on == ["dep1", "dep2"]
+
     async def test_update_todo_from_multiple(self) -> None:
         """Test updating a todo that's not first in the list."""
         storage = AsyncMemoryStorage()

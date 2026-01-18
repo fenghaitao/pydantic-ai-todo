@@ -39,9 +39,31 @@ class TestTodo:
 
     def test_todo_status_values(self) -> None:
         """Test all valid status values."""
-        for status in ["pending", "in_progress", "completed"]:
+        for status in ["pending", "in_progress", "completed", "blocked"]:
             todo = Todo(content="Task", status=status, active_form="Working")  # type: ignore[arg-type]
             assert todo.status == status
+
+    def test_todo_parent_id_default(self) -> None:
+        """Test that parent_id defaults to None."""
+        todo = Todo(content="Task", status="pending", active_form="Working")
+        assert todo.parent_id is None
+
+    def test_todo_parent_id_set(self) -> None:
+        """Test setting parent_id."""
+        todo = Todo(content="Task", status="pending", active_form="Working", parent_id="parent123")
+        assert todo.parent_id == "parent123"
+
+    def test_todo_depends_on_default(self) -> None:
+        """Test that depends_on defaults to empty list."""
+        todo = Todo(content="Task", status="pending", active_form="Working")
+        assert todo.depends_on == []
+
+    def test_todo_depends_on_set(self) -> None:
+        """Test setting depends_on."""
+        todo = Todo(
+            content="Task", status="pending", active_form="Working", depends_on=["task1", "task2"]
+        )
+        assert todo.depends_on == ["task1", "task2"]
 
     def test_todo_invalid_status(self) -> None:
         """Test that invalid status raises validation error."""
