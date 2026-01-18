@@ -36,11 +36,12 @@ Use this tool in these scenarios:
 TODO_SYSTEM_PROMPT = """
 ## Task Management
 
-You have access to the `write_todos` tool to track your tasks.
-Use it frequently to:
-- Plan complex tasks before starting
-- Show progress to the user
-- Keep track of what's done and what's pending
+You have access to todo tools to track your tasks:
+- `read_todos` - View current tasks with their IDs and statuses
+- `write_todos` - Replace the entire todo list
+- `add_todo` - Add a single new task
+- `update_todo_status` - Change a task's status by ID
+- `remove_todo` - Delete a task by ID
 
 When working on tasks:
 1. Break down complex tasks into smaller steps
@@ -56,7 +57,28 @@ Use this tool to check the current status of all tasks before:
 - Updating task statuses
 - Reporting progress to the user
 
-Returns all todos with their current status (pending, in_progress, completed).
+Returns all todos with their ID, current status (pending, in_progress, completed), and content.
+"""
+
+ADD_TODO_DESCRIPTION = """
+Add a single new todo item to the list.
+
+Use this tool to add a new task without replacing existing todos.
+Returns the ID of the newly created todo.
+"""
+
+UPDATE_TODO_STATUS_DESCRIPTION = """
+Update the status of an existing todo by its ID.
+
+Use this tool to change a todo's status to pending, in_progress, or completed.
+Returns confirmation or error if the todo is not found.
+"""
+
+REMOVE_TODO_DESCRIPTION = """
+Remove a todo from the list by its ID.
+
+Use this tool to delete a task that is no longer needed.
+Returns confirmation or error if the todo is not found.
 """
 
 
@@ -116,7 +138,7 @@ def create_todo_toolset(
                 "in_progress": "[*]",
                 "completed": "[x]",
             }.get(todo.status, "[ ]")
-            lines.append(f"{i}. {status_icon} {todo.content}")
+            lines.append(f"{i}. {status_icon} [{todo.id}] {todo.content}")
 
         # Add summary
         counts = {"pending": 0, "in_progress": 0, "completed": 0}
@@ -139,9 +161,17 @@ def create_todo_toolset(
         Args:
             todos: List of todo items with content, status, and active_form.
         """
-        _storage.todos = [
-            Todo(content=t.content, status=t.status, active_form=t.active_form) for t in todos
-        ]
+        new_todos: list[Todo] = []
+        for t in todos:
+            if t.id is not None:
+                new_todos.append(
+                    Todo(id=t.id, content=t.content, status=t.status, active_form=t.active_form)
+                )
+            else:
+                new_todos.append(
+                    Todo(content=t.content, status=t.status, active_form=t.active_form)
+                )
+        _storage.todos = new_todos
 
         # Count by status
         counts = {"pending": 0, "in_progress": 0, "completed": 0}
@@ -154,6 +184,60 @@ def create_todo_toolset(
             f"{counts['in_progress']} in progress, "
             f"{counts['pending']} pending"
         )
+
+    @toolset.tool(description=ADD_TODO_DESCRIPTION)
+    async def add_todo(content: str, active_form: str) -> str:
+        """Add a new todo item to the list.
+
+        Args:
+            content: The task description in imperative form.
+            active_form: Present continuous form shown during execution.
+
+        Returns:
+            Confirmation message with the new todo's ID.
+        """
+        new_todo = Todo(content=content, status="pending", active_form=active_form)
+        _storage.todos = [*_storage.todos, new_todo]
+        return f"Added todo '{content}' with ID: {new_todo.id}"
+
+    @toolset.tool(description=UPDATE_TODO_STATUS_DESCRIPTION)
+    async def update_todo_status(todo_id: str, status: str) -> str:
+        """Update the status of an existing todo.
+
+        Args:
+            todo_id: The ID of the todo to update.
+            status: New status (pending, in_progress, or completed).
+
+        Returns:
+            Confirmation message or error if not found.
+        """
+        valid_statuses = {"pending", "in_progress", "completed"}
+        if status not in valid_statuses:
+            return f"Invalid status '{status}'. Must be one of: {', '.join(sorted(valid_statuses))}"
+
+        for todo in _storage.todos:
+            if todo.id == todo_id:
+                todo.status = status  # type: ignore[assignment]
+                return f"Updated todo '{todo.content}' status to '{status}'"
+
+        return f"Todo with ID '{todo_id}' not found"
+
+    @toolset.tool(description=REMOVE_TODO_DESCRIPTION)
+    async def remove_todo(todo_id: str) -> str:
+        """Remove a todo from the list.
+
+        Args:
+            todo_id: The ID of the todo to remove.
+
+        Returns:
+            Confirmation message or error if not found.
+        """
+        for i, todo in enumerate(_storage.todos):
+            if todo.id == todo_id:
+                removed = _storage.todos.pop(i)
+                return f"Removed todo '{removed.content}' (ID: {todo_id})"
+
+        return f"Todo with ID '{todo_id}' not found"
 
     return toolset
 

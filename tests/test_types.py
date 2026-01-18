@@ -19,6 +19,23 @@ class TestTodo:
         assert todo.content == "Implement feature X"
         assert todo.status == "pending"
         assert todo.active_form == "Implementing feature X"
+        assert len(todo.id) == 8  # auto-generated id
+
+    def test_todo_with_custom_id(self) -> None:
+        """Test creating a todo with custom id."""
+        todo = Todo(
+            id="abc12345",
+            content="Task",
+            status="pending",
+            active_form="Working",
+        )
+        assert todo.id == "abc12345"
+
+    def test_todo_id_auto_generated(self) -> None:
+        """Test that each todo gets a unique auto-generated id."""
+        todo1 = Todo(content="Task 1", status="pending", active_form="Working")
+        todo2 = Todo(content="Task 2", status="pending", active_form="Working")
+        assert todo1.id != todo2.id
 
     def test_todo_status_values(self) -> None:
         """Test all valid status values."""
@@ -39,11 +56,11 @@ class TestTodo:
             active_form="Working",
         )
         data = todo.model_dump()
-        assert data == {
-            "content": "Task",
-            "status": "in_progress",
-            "active_form": "Working",
-        }
+        assert data["content"] == "Task"
+        assert data["status"] == "in_progress"
+        assert data["active_form"] == "Working"
+        assert "id" in data
+        assert len(data["id"]) == 8  # 8-char hex string
 
 
 class TestTodoItem:

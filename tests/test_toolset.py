@@ -32,6 +32,21 @@ class TestCreateTodoToolset:
         toolset = create_todo_toolset()
         assert "write_todos" in toolset.tools
 
+    def test_toolset_has_add_todo_tool(self) -> None:
+        """Test that toolset has add_todo tool."""
+        toolset = create_todo_toolset()
+        assert "add_todo" in toolset.tools
+
+    def test_toolset_has_update_todo_status_tool(self) -> None:
+        """Test that toolset has update_todo_status tool."""
+        toolset = create_todo_toolset()
+        assert "update_todo_status" in toolset.tools
+
+    def test_toolset_has_remove_todo_tool(self) -> None:
+        """Test that toolset has remove_todo tool."""
+        toolset = create_todo_toolset()
+        assert "remove_todo" in toolset.tools
+
     def test_toolset_with_custom_id(self) -> None:
         """Test creating toolset with custom ID."""
         toolset = create_todo_toolset(id="my-todos")
@@ -75,9 +90,9 @@ class TestReadTodos:
     ) -> None:
         """Test reading todos with items."""
         storage.todos = [
-            Todo(content="Task 1", status="pending", active_form="Working on Task 1"),
-            Todo(content="Task 2", status="in_progress", active_form="Working on Task 2"),
-            Todo(content="Task 3", status="completed", active_form="Working on Task 3"),
+            Todo(id="id1", content="Task 1", status="pending", active_form="Working on Task 1"),
+            Todo(id="id2", content="Task 2", status="in_progress", active_form="Working on Task 2"),
+            Todo(id="id3", content="Task 3", status="completed", active_form="Working on Task 3"),
         ]
 
         read_todos = toolset.tools["read_todos"]
@@ -89,6 +104,10 @@ class TestReadTodos:
         assert "[ ]" in result  # pending icon
         assert "[*]" in result  # in_progress icon
         assert "[x]" in result  # completed icon
+        # Verify IDs are shown
+        assert "[id1]" in result
+        assert "[id2]" in result
+        assert "[id3]" in result
 
     async def test_read_todos_summary(
         self, storage: TodoStorage, toolset: FunctionToolset[Any]
@@ -170,6 +189,21 @@ class TestWriteTodos:
         assert "1 in progress" in result
         assert "1 pending" in result
 
+    async def test_write_todos_with_custom_id(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test writing todos with custom IDs preserves them."""
+        write_todos = toolset.tools["write_todos"]
+        items = [
+            TodoItem(id="custom1", content="Task 1", status="pending", active_form="Working"),
+            TodoItem(id="custom2", content="Task 2", status="pending", active_form="Working"),
+        ]
+        await write_todos.function(todos=items)  # type: ignore[call-arg]
+
+        assert len(storage.todos) == 2
+        assert storage.todos[0].id == "custom1"
+        assert storage.todos[1].id == "custom2"
+
 
 class TestGetTodoSystemPrompt:
     """Tests for get_todo_system_prompt function."""
@@ -218,3 +252,203 @@ class TestGetTodoSystemPrompt:
         assert "[ ] Pending" in prompt
         assert "[*] In Progress" in prompt
         assert "[x] Completed" in prompt
+
+
+class TestAddTodo:
+    """Tests for add_todo tool."""
+
+    @pytest.fixture
+    def storage(self) -> TodoStorage:
+        """Create a storage instance."""
+        return TodoStorage()
+
+    @pytest.fixture
+    def toolset(self, storage: TodoStorage) -> FunctionToolset[Any]:
+        """Create a toolset with the storage."""
+        return create_todo_toolset(storage=storage)
+
+    async def test_add_todo_to_empty_list(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test adding a todo to an empty list."""
+        add_todo = toolset.tools["add_todo"]
+        result = await add_todo.function(content="New task", active_form="Working on new task")  # type: ignore[call-arg]
+
+        assert len(storage.todos) == 1
+        assert storage.todos[0].content == "New task"
+        assert storage.todos[0].active_form == "Working on new task"
+        assert storage.todos[0].status == "pending"
+        assert "Added todo" in result
+        assert storage.todos[0].id in result
+
+    async def test_add_todo_to_existing_list(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test adding a todo to an existing list."""
+        storage.todos = [
+            Todo(content="Existing task", status="pending", active_form="Working"),
+        ]
+
+        add_todo = toolset.tools["add_todo"]
+        await add_todo.function(content="New task", active_form="Working on new task")  # type: ignore[call-arg]
+
+        assert len(storage.todos) == 2
+        assert storage.todos[0].content == "Existing task"
+        assert storage.todos[1].content == "New task"
+
+    async def test_add_todo_returns_id(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test that add_todo returns the new todo's ID."""
+        add_todo = toolset.tools["add_todo"]
+        result = await add_todo.function(content="Task", active_form="Working")  # type: ignore[call-arg]
+
+        assert "ID:" in result
+        assert storage.todos[0].id in result
+
+
+class TestUpdateTodoStatus:
+    """Tests for update_todo_status tool."""
+
+    @pytest.fixture
+    def storage(self) -> TodoStorage:
+        """Create a storage instance."""
+        return TodoStorage()
+
+    @pytest.fixture
+    def toolset(self, storage: TodoStorage) -> FunctionToolset[Any]:
+        """Create a toolset with the storage."""
+        return create_todo_toolset(storage=storage)
+
+    async def test_update_status_to_in_progress(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test updating status to in_progress."""
+        todo = Todo(id="abc123", content="Task", status="pending", active_form="Working")
+        storage.todos = [todo]
+
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="abc123", status="in_progress")  # type: ignore[call-arg]
+
+        assert storage.todos[0].status == "in_progress"
+        assert "Updated todo" in result
+        assert "in_progress" in result
+
+    async def test_update_status_to_completed(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test updating status to completed."""
+        todo = Todo(id="abc123", content="Task", status="in_progress", active_form="Working")
+        storage.todos = [todo]
+
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="abc123", status="completed")  # type: ignore[call-arg]
+
+        assert storage.todos[0].status == "completed"
+        assert "completed" in result
+
+    async def test_update_status_to_pending(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test updating status back to pending."""
+        todo = Todo(id="abc123", content="Task", status="in_progress", active_form="Working")
+        storage.todos = [todo]
+
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="abc123", status="pending")  # type: ignore[call-arg]
+
+        assert storage.todos[0].status == "pending"
+        assert "pending" in result
+
+    async def test_update_status_not_found_empty(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test updating status for non-existent todo in empty list."""
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="nonexistent", status="completed")  # type: ignore[call-arg]
+
+        assert "not found" in result
+
+    async def test_update_status_not_found_with_items(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test updating status for non-existent todo when other todos exist."""
+        storage.todos = [
+            Todo(id="other1", content="Task 1", status="pending", active_form="Working"),
+            Todo(id="other2", content="Task 2", status="pending", active_form="Working"),
+        ]
+
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="nonexistent", status="completed")  # type: ignore[call-arg]
+
+        assert "not found" in result
+        # Verify other todos unchanged
+        assert len(storage.todos) == 2
+        assert all(t.status == "pending" for t in storage.todos)
+
+    async def test_update_status_invalid_status(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test updating with invalid status."""
+        todo = Todo(id="abc123", content="Task", status="pending", active_form="Working")
+        storage.todos = [todo]
+
+        update_status = toolset.tools["update_todo_status"]
+        result = await update_status.function(todo_id="abc123", status="invalid")  # type: ignore[call-arg]
+
+        assert "Invalid status" in result
+        assert storage.todos[0].status == "pending"  # unchanged
+
+
+class TestRemoveTodo:
+    """Tests for remove_todo tool."""
+
+    @pytest.fixture
+    def storage(self) -> TodoStorage:
+        """Create a storage instance."""
+        return TodoStorage()
+
+    @pytest.fixture
+    def toolset(self, storage: TodoStorage) -> FunctionToolset[Any]:
+        """Create a toolset with the storage."""
+        return create_todo_toolset(storage=storage)
+
+    async def test_remove_existing_todo(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test removing an existing todo."""
+        todo = Todo(id="abc123", content="Task to remove", status="pending", active_form="Working")
+        storage.todos = [todo]
+
+        remove_todo = toolset.tools["remove_todo"]
+        result = await remove_todo.function(todo_id="abc123")  # type: ignore[call-arg]
+
+        assert len(storage.todos) == 0
+        assert "Removed todo" in result
+        assert "abc123" in result
+
+    async def test_remove_todo_from_multiple(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test removing one todo from multiple."""
+        storage.todos = [
+            Todo(id="id1", content="Task 1", status="pending", active_form="Working"),
+            Todo(id="id2", content="Task 2", status="pending", active_form="Working"),
+            Todo(id="id3", content="Task 3", status="pending", active_form="Working"),
+        ]
+
+        remove_todo = toolset.tools["remove_todo"]
+        await remove_todo.function(todo_id="id2")  # type: ignore[call-arg]
+
+        assert len(storage.todos) == 2
+        assert storage.todos[0].id == "id1"
+        assert storage.todos[1].id == "id3"
+
+    async def test_remove_nonexistent_todo(
+        self, storage: TodoStorage, toolset: FunctionToolset[Any]
+    ) -> None:
+        """Test removing a non-existent todo."""
+        remove_todo = toolset.tools["remove_todo"]
+        result = await remove_todo.function(todo_id="nonexistent")  # type: ignore[call-arg]
+
+        assert "not found" in result
