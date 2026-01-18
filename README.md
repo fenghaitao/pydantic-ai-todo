@@ -2,10 +2,6 @@
 
 > **Looking for a complete agent framework?** Check out [pydantic-deep](https://github.com/vstorm-co/pydantic-deepagents) - a full-featured deep agent framework with planning, subagents, and skills system built on pydantic-ai.
 
-> **Need file storage or Docker sandbox?** Check out [pydantic-ai-backend](https://github.com/vstorm-co/pydantic-ai-backend) - file storage and sandbox backends that work with any pydantic-ai agent.
-
-> **Want a full-stack template?** Check out [fastapi-fullstack](https://github.com/vstorm-co/full-stack-fastapi-nextjs-llm-template) - production-ready AI/LLM application template with FastAPI, Next.js, and pydantic-deep integration.
-
 [![PyPI version](https://img.shields.io/pypi/v/pydantic-ai-todo.svg)](https://pypi.org/project/pydantic-ai-todo/)
 [![CI](https://github.com/vstorm-co/pydantic-ai-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/vstorm-co/pydantic-ai-todo/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/vstorm-co/pydantic-ai-todo)
@@ -16,7 +12,14 @@ Todo/task planning toolset for [pydantic-ai](https://ai.pydantic.dev/) agents.
 
 **This library was extracted from [pydantic-deep](https://github.com/vstorm-co/pydantic-deepagents)** to provide standalone task planning for any pydantic-ai agent without requiring the full framework.
 
-Provides `read_todos` and `write_todos` tools that help AI agents track and manage tasks during a session.
+## Features
+
+- **Task Management** - `read_todos`, `write_todos`, `add_todo`, `update_todo_status`, `remove_todo`
+- **Unique IDs** - Auto-generated 8-char hex IDs for each task
+- **Task Hierarchy** - Optional subtasks and dependencies with cycle detection
+- **Multiple Storage Backends** - In-memory, async, and PostgreSQL
+- **Event System** - React to task changes with sync/async callbacks
+- **100% Test Coverage** - Production-ready with strict type checking
 
 ## Installation
 
@@ -48,8 +51,6 @@ result = await agent.run("Create a todo list for building a website")
 
 ## Usage with Storage Access
 
-If you need to access the todos after the agent runs:
-
 ```python
 from pydantic_ai import Agent
 from pydantic_ai_todo import create_todo_toolset, TodoStorage
@@ -59,104 +60,161 @@ storage = TodoStorage()
 toolset = create_todo_toolset(storage=storage)
 
 agent = Agent("openai:gpt-4.1", toolsets=[toolset])
-
-# Run the agent
 result = await agent.run("Plan the implementation of a REST API")
 
 # Access todos directly
 for todo in storage.todos:
-    print(f"[{todo.status}] {todo.content}")
+    print(f"[{todo.status}] [{todo.id}] {todo.content}")
 ```
 
-## Custom Storage
+## Async Storage
 
-You can implement custom storage (e.g., for persistence):
+For async operations and future persistence support:
 
 ```python
-import json
-from pydantic_ai_todo import create_todo_toolset, TodoStorageProtocol, Todo
+from pydantic_ai import Agent
+from pydantic_ai_todo import create_todo_toolset, AsyncMemoryStorage
 
-class RedisTodoStorage:
-    """Store todos in Redis."""
+storage = AsyncMemoryStorage()
+toolset = create_todo_toolset(async_storage=storage)
 
-    def __init__(self, redis_client):
-        self._redis = redis_client
+agent = Agent("openai:gpt-4.1", toolsets=[toolset])
+result = await agent.run("Plan a feature implementation")
 
-    @property
-    def todos(self) -> list[Todo]:
-        data = self._redis.get("todos")
-        if not data:
-            return []
-        return [Todo(**t) for t in json.loads(data)]
-
-    @todos.setter
-    def todos(self, value: list[Todo]) -> None:
-        self._redis.set("todos", json.dumps([t.model_dump() for t in value]))
-
-# Use with agent
-storage = RedisTodoStorage(redis.Redis())
-agent = Agent("openai:gpt-4.1", toolsets=[create_todo_toolset(storage)])
+# After agent runs - access todos via async methods
+todos = await storage.get_todos()
+todo = await storage.get_todo("abc12345")
+await storage.update_todo("abc12345", status="completed")
 ```
 
-## System Prompt Integration
+## PostgreSQL Storage
 
-Include current todos in the system prompt:
+For persistent storage with PostgreSQL:
 
 ```python
-from pydantic_ai_todo import get_todo_system_prompt, TodoStorage
+from pydantic_ai import Agent
+from pydantic_ai_todo import create_storage, create_todo_toolset
 
-storage = TodoStorage()
-# ... agent populates todos ...
+# Create storage with connection string
+storage = create_storage(
+    "postgres",
+    connection_string="postgresql://user:pass@localhost/db",
+    session_id="user-123"  # Multi-tenancy support
+)
+await storage.initialize()  # Creates table if not exists
 
-# Generate system prompt section with current todos
-prompt_section = get_todo_system_prompt(storage)
+toolset = create_todo_toolset(async_storage=storage)
+
+agent = Agent("openai:gpt-4.1", toolsets=[toolset])
+result = await agent.run("Plan the project milestones")
+
+# Todos are now persisted in PostgreSQL
+# Clean up when done
+await storage.close()
 ```
+
+See [Storage Documentation](docs/storage.md) for more details.
+
+## Task Hierarchy (Subtasks & Dependencies)
+
+Enable subtask support for complex task management:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai_todo import create_todo_toolset, AsyncMemoryStorage
+
+storage = AsyncMemoryStorage()
+toolset = create_todo_toolset(async_storage=storage, enable_subtasks=True)
+
+agent = Agent("openai:gpt-4.1", toolsets=[toolset])
+result = await agent.run("Break down the API implementation into subtasks with dependencies")
+```
+
+This adds tools for:
+- `add_subtask` - Create child tasks
+- `set_dependency` - Link tasks (with cycle detection)
+- `get_available_tasks` - List tasks ready to work on
+- Hierarchical view in `read_todos`
+
+See [Subtasks Documentation](docs/subtasks.md) for more details.
+
+## Event System
+
+React to task changes:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai_todo import create_todo_toolset, TodoEventEmitter, AsyncMemoryStorage
+
+emitter = TodoEventEmitter()
+
+@emitter.on_completed
+async def notify_completed(event):
+    print(f"Task completed: {event.todo.content}")
+
+@emitter.on_created
+async def notify_created(event):
+    print(f"Task created: {event.todo.content}")
+
+storage = AsyncMemoryStorage(event_emitter=emitter)
+toolset = create_todo_toolset(async_storage=storage)
+
+agent = Agent("openai:gpt-4.1", toolsets=[toolset])
+result = await agent.run("Create and complete a simple task")
+# Events will fire as agent creates/completes tasks
+```
+
+See [Events Documentation](docs/events.md) for more details.
 
 ## API Reference
 
-### `create_todo_toolset(storage=None, *, id=None)`
+### Core Functions
 
-Creates a todo toolset with `read_todos` and `write_todos` tools.
+| Function | Description |
+|----------|-------------|
+| `create_todo_toolset(storage?, async_storage?, enable_subtasks?)` | Create toolset with todo tools |
+| `get_todo_system_prompt(storage?)` | Generate system prompt with current todos |
+| `get_todo_system_prompt_async(storage?)` | Async version of system prompt generator |
+| `create_storage(backend, **options)` | Factory for storage backends |
 
-**Parameters:**
-- `storage`: Optional `TodoStorageProtocol` implementation. Defaults to in-memory `TodoStorage`.
-- `id`: Optional unique ID for the toolset.
+### Models
 
-**Returns:** `FunctionToolset[Any]`
+| Model | Description |
+|-------|-------------|
+| `Todo` | Task model with id, content, status, active_form, parent_id, depends_on |
+| `TodoItem` | Input model for write_todos with Field descriptions for LLM |
+| `TodoEvent` | Event data with event_type, todo, timestamp, previous_state |
+| `TodoEventType` | Enum: CREATED, UPDATED, STATUS_CHANGED, DELETED, COMPLETED |
 
-### `get_todo_system_prompt(storage=None)`
+### Storage Classes
 
-Generates a system prompt section for task management.
+| Class | Description |
+|-------|-------------|
+| `TodoStorage` | Simple sync in-memory storage |
+| `AsyncMemoryStorage` | Async in-memory storage with CRUD methods |
+| `AsyncPostgresStorage` | PostgreSQL storage with session-based multi-tenancy |
+| `TodoEventEmitter` | Event emitter for task change notifications |
 
-**Parameters:**
-- `storage`: Optional storage to read current todos from.
+### Tools (registered with toolset)
 
-**Returns:** `str` - System prompt with optional current todos section.
+| Tool | Description |
+|------|-------------|
+| `read_todos` | List all tasks (supports hierarchical view) |
+| `write_todos` | Bulk write/update tasks |
+| `add_todo` | Add single task |
+| `update_todo_status` | Update task status by ID |
+| `remove_todo` | Delete task by ID |
+| `add_subtask`* | Create child task |
+| `set_dependency`* | Link tasks with dependency |
+| `get_available_tasks`* | List tasks ready to work on |
 
-### `Todo`
+*Only available when `enable_subtasks=True`
 
-Pydantic model for a todo item.
+## Documentation
 
-```python
-class Todo(BaseModel):
-    content: str  # Task description in imperative form
-    status: Literal["pending", "in_progress", "completed"]
-    active_form: str  # Present continuous form (e.g., "Implementing...")
-```
-
-### `TodoStorage`
-
-Default in-memory storage implementation.
-
-```python
-storage = TodoStorage()
-storage.todos = [Todo(...), Todo(...)]
-print(storage.todos)
-```
-
-### `TodoStorageProtocol`
-
-Protocol for custom storage implementations. Must have a `todos` property with getter and setter.
+- [Storage Backends](docs/storage.md) - In-memory, async, PostgreSQL
+- [Event System](docs/events.md) - Callbacks and event handling
+- [Task Hierarchy](docs/subtasks.md) - Subtasks and dependencies
 
 ## Related Projects
 
