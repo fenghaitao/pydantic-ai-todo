@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-01-22
+
+### Added
+
+- **Full Documentation Site**: MkDocs Material documentation matching pydantic-deep style
+  - Concepts: Toolset, Storage, Types
+  - Advanced: Subtasks & Dependencies, Event System
+  - Examples: Basic Usage, Async Storage, PostgreSQL, Subtasks, Events
+  - API Reference: Auto-generated from docstrings
+- **GitHub Actions Workflow**: Auto-deploy docs to GitHub Pages on push to main
+- **Custom Styling**: Pink theme with Inter/JetBrains Mono fonts
+
+### Changed
+
+- **README**: Complete rewrite with centered header, badges, Use Cases table, and vstorm-co branding
+
+### Fixed
+
+- Documentation accuracy: Added missing "blocked" status to all status lists
+- Documentation accuracy: Fixed `previous_state` type from `str | None` to `Todo | None`
+
 ## [0.1.3] - 2025-01-18
 
 ### Added
