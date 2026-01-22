@@ -1,0 +1,164 @@
+# Toolset
+
+The todo toolset provides task management tools for your Pydantic AI agent.
+
+## Creating the Toolset
+
+```python
+from pydantic_ai_todo import create_todo_toolset
+
+# Basic usage (in-memory storage)
+toolset = create_todo_toolset()
+
+# With custom storage
+from pydantic_ai_todo import TodoStorage
+storage = TodoStorage()
+toolset = create_todo_toolset(storage=storage)
+
+# With async storage
+from pydantic_ai_todo import AsyncMemoryStorage
+storage = AsyncMemoryStorage()
+toolset = create_todo_toolset(async_storage=storage)
+
+# With subtasks enabled
+toolset = create_todo_toolset(
+    async_storage=storage,
+    enable_subtasks=True,
+)
+```
+
+## Available Tools
+
+### Core Tools
+
+| Tool | Description |
+|------|-------------|
+| `read_todos` | List all tasks with status and IDs |
+| `write_todos` | Bulk write/replace tasks |
+| `add_todo` | Add a single new task |
+| `update_todo_status` | Update a task's status by ID |
+| `remove_todo` | Delete a task by ID |
+
+### Subtask Tools
+
+When `enable_subtasks=True`:
+
+| Tool | Description |
+|------|-------------|
+| `add_subtask` | Create a child task under a parent |
+| `set_dependency` | Link two tasks with dependency |
+| `get_available_tasks` | List tasks ready to work on |
+
+## Tool Details
+
+### read_todos
+
+Lists all tasks in a formatted view.
+
+```python
+# Agent calls this internally
+# Returns something like:
+"""
+Tasks:
+- [pending] [abc12345] Set up project structure
+- [in_progress] [def67890] Write documentation
+- [completed] [ghi11111] Create README
+"""
+```
+
+### write_todos
+
+Bulk write tasks. Useful for initial planning.
+
+```python
+# The agent provides a list of TodoItem objects
+# Each item has: content, status, active_form
+```
+
+### add_todo
+
+Add a single task.
+
+```python
+# Agent provides: content, active_form (optional)
+# Returns: task ID
+```
+
+### update_todo_status
+
+Update a task's status.
+
+```python
+# Agent provides: task_id, new_status
+# Statuses: "pending", "in_progress", "completed", "blocked"
+```
+
+### remove_todo
+
+Delete a task by ID.
+
+```python
+# Agent provides: task_id
+# Returns: success/failure message
+```
+
+## Adding to Your Agent
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai_todo import create_todo_toolset
+
+agent = Agent(
+    "openai:gpt-4o",
+    toolsets=[create_todo_toolset()],
+    system_prompt="""You are a helpful assistant with task management.
+
+Use the todo tools to:
+- Break down complex requests into tasks
+- Track progress on multi-step work
+- Mark tasks complete as you finish them
+""",
+)
+```
+
+## Factory Parameters
+
+```python
+def create_todo_toolset(
+    storage: TodoStorageProtocol | None = None,
+    async_storage: AsyncTodoStorageProtocol | None = None,
+    enable_subtasks: bool = False,
+) -> Toolset:
+    """Create a todo toolset.
+    
+    Args:
+        storage: Sync storage backend (e.g., TodoStorage)
+        async_storage: Async storage backend (e.g., AsyncMemoryStorage)
+        enable_subtasks: Enable subtask and dependency tools
+        
+    Returns:
+        A Toolset with todo management tools
+    """
+```
+
+## System Prompt Helper
+
+Generate a system prompt with current todos:
+
+```python
+from pydantic_ai_todo import get_todo_system_prompt, TodoStorage
+
+storage = TodoStorage()
+storage.todos = [...]  # existing todos
+
+prompt = get_todo_system_prompt(storage)
+# Returns formatted prompt with current task list
+```
+
+Async version:
+
+```python
+from pydantic_ai_todo import get_todo_system_prompt_async
+
+prompt = await get_todo_system_prompt_async(async_storage)
+```
