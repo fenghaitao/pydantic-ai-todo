@@ -126,18 +126,21 @@ Use the todo tools to:
 ```python
 def create_todo_toolset(
     storage: TodoStorageProtocol | None = None,
+    *,
     async_storage: AsyncTodoStorageProtocol | None = None,
+    id: str | None = None,
     enable_subtasks: bool = False,
-) -> Toolset:
+) -> FunctionToolset[Any]:
     """Create a todo toolset.
-    
+
     Args:
         storage: Sync storage backend (e.g., TodoStorage)
         async_storage: Async storage backend (e.g., AsyncMemoryStorage)
+        id: Optional toolset identifier
         enable_subtasks: Enable subtask and dependency tools
-        
+
     Returns:
-        A Toolset with todo management tools
+        A FunctionToolset with todo management tools
     """
 ```
 
