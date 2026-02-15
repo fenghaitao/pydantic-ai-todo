@@ -251,6 +251,115 @@ async def broadcast_update(event):
     })
 ```
 
+## Subscription Patterns
+
+### Single Event, Multiple Subscribers
+
+Multiple callbacks can listen to the same event type. All are called in registration order:
+
+```python
+emitter = TodoEventEmitter()
+
+@emitter.on_completed
+async def log_completion(event):
+    print(f"[LOG] Completed: {event.todo.content}")
+
+@emitter.on_completed
+async def send_notification(event):
+    await slack.post_message(f"Task done: {event.todo.content}")
+
+@emitter.on_completed
+async def update_metrics(event):
+    metrics.increment("tasks_completed")
+
+# When a task completes, all three callbacks fire in order:
+# 1. log_completion
+# 2. send_notification
+# 3. update_metrics
+```
+
+### Single Subscriber, Multiple Events
+
+Use stacked decorators to have one callback handle several event types:
+
+```python
+@emitter.on_created
+@emitter.on_updated
+@emitter.on_deleted
+async def broadcast_change(event):
+    """Send all changes to connected WebSocket clients."""
+    await websocket.broadcast({
+        "type": event.event_type.value,
+        "todo": event.todo.model_dump(),
+    })
+```
+
+### Conditional Handling
+
+Filter events inside the callback for fine-grained control:
+
+```python
+@emitter.on_status_changed
+async def handle_status_change(event):
+    old = event.previous_state.status if event.previous_state else None
+    new = event.todo.status
+
+    if old == "pending" and new == "in_progress":
+        print(f"Started: {event.todo.content}")
+    elif new == "blocked":
+        print(f"Blocked: {event.todo.content}")
+    elif new == "completed":
+        await celebrate(event.todo)
+```
+
+### Dynamic Registration and Unregistration
+
+Use `on()` and `off()` for runtime subscription management:
+
+```python
+emitter = TodoEventEmitter()
+
+# Register dynamically
+async def temporary_logger(event):
+    print(f"[TEMP] {event.event_type.value}: {event.todo.content}")
+
+emitter.on(TodoEventType.CREATED, temporary_logger)
+
+# Later, unregister when no longer needed
+emitter.off(TodoEventType.CREATED, temporary_logger)
+```
+
+### Class-Based Event Handlers
+
+Organize related handlers in a class:
+
+```python
+class TaskNotifier:
+    def __init__(self, emitter: TodoEventEmitter):
+        emitter.on_created(self.on_created)
+        emitter.on_completed(self.on_completed)
+        emitter.on_deleted(self.on_deleted)
+
+    async def on_created(self, event):
+        await self._send(f"New task: {event.todo.content}")
+
+    async def on_completed(self, event):
+        await self._send(f"Done: {event.todo.content}")
+
+    async def on_deleted(self, event):
+        await self._send(f"Removed: {event.todo.content}")
+
+    async def _send(self, message: str):
+        # Send to Slack, email, webhook, etc.
+        print(message)
+
+# Usage
+emitter = TodoEventEmitter()
+notifier = TaskNotifier(emitter)
+
+storage = AsyncMemoryStorage(event_emitter=emitter)
+```
+
 ## Manual Event Emission
 
 For custom scenarios:

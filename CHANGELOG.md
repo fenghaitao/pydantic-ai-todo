@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-02-15
+
+### Added
+
+- **Event Subscription Patterns**: New documentation section covering:
+  - Single event, multiple subscribers
+  - Single subscriber, multiple events via stacked decorators
+  - Conditional event handling
+  - Dynamic registration/unregistration at runtime
+  - Class-based event handlers for organizing related logic
+- **Cycle Detection Deep Dive**: Expanded documentation explaining:
+  - DFS algorithm for cycle detection
+  - Self-dependency, direct cycle, and transitive cycle cases
+  - Diamond dependencies (allowed)
+  - Practical examples for each case
+- **Multi-Tenancy Example**: New guide for per-user task isolation in web applications
+- **Migration Guide**: New guide for transitioning from memory to PostgreSQL storage
+
+### Changed
+
+- **Navigation**: Updated docs nav to include multi-tenancy and migration guide
+
 ## [0.1.6] - 2026-02-03
 
 ### Changed
