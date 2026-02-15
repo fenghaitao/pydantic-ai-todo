@@ -10,6 +10,8 @@ Practical examples showing how to use Todo Toolset in different scenarios.
 ## Storage
 
 - [PostgreSQL](postgres.md) — Persistent multi-tenant storage
+- [Multi-Tenancy](multi-tenancy.md) — Per-user isolation in web apps
+- [Migration Guide](migration-guide.md) — Moving from memory to PostgreSQL
 
 ## Features
 

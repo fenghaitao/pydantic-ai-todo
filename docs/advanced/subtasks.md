@@ -101,15 +101,99 @@ When you set a dependency on an incomplete task:
 
 ### Cycle Detection
 
-Circular dependencies are prevented:
+Circular dependencies are prevented. The library uses a **depth-first search (DFS)** algorithm
+to detect cycles before adding any new dependency.
+
+#### How It Works
+
+When you call `set_dependency(todo_id="X", depends_on_id="Y")`, the library checks whether
+adding this edge would create a cycle in the dependency graph. It does so by starting at
+node `Y` and walking the existing `depends_on` edges. If it ever reaches `X`, a cycle would
+be formed and the dependency is rejected.
+
+The algorithm in pseudocode:
 
 ```
-Task A depends on Task B
-Task B depends on Task C
-Task C depends on Task A  # ERROR: Would create cycle
+function has_cycle(todo_id, depends_on_id):
+    visited = {}
+    function visit(current_id):
+        if current_id == todo_id:
+            return True          # Found a path back to the origin -> cycle
+        if current_id in visited:
+            return False          # Already explored, no cycle here
+        visited.add(current_id)
+        for each dep_id in current_id.depends_on:
+            if visit(dep_id):
+                return True
+        return False
+    return visit(depends_on_id)
 ```
 
-Diamond-shaped dependencies are allowed:
+The actual implementation lives in the `_has_cycle` function inside
+[`pydantic_ai_todo/toolset.py`](https://github.com/vstorm-co/pydantic-ai-todo):
+
+```python
+def _has_cycle(todo_id: str, depends_on_id: str) -> bool:
+    """Check if adding a dependency would create a cycle."""
+    visited: set[str] = set()
+
+    def visit(current_id: str) -> bool:
+        if current_id == todo_id:
+            return True
+        if current_id in visited:
+            return False
+        visited.add(current_id)
+        todo = _get_todo_by_id(current_id)
+        if todo:
+            for dep_id in todo.depends_on:
+                if visit(dep_id):
+                    return True
+        return False
+
+    return visit(depends_on_id)
+```
+
+#### What Happens When a Cycle Is Detected
+
+The `set_dependency` tool returns an error message and the dependency is **not** added:
+
+```
+"Cannot add dependency: would create a cycle"
+```
+
+The task graph remains unchanged. Three specific cases are checked:
+
+| Case | Result |
+|------|--------|
+| Self-dependency (`A -> A`) | `"A todo cannot depend on itself"` |
+| Direct cycle (`A -> B -> A`) | `"Cannot add dependency: would create a cycle"` |
+| Transitive cycle (`A -> B -> C -> A`) | `"Cannot add dependency: would create a cycle"` |
+
+#### Examples
+
+**Self-dependency** -- rejected immediately:
+
+```
+set_dependency(todo_id="A", depends_on_id="A")
+# Result: "A todo cannot depend on itself"
+```
+
+**Direct cycle** -- two tasks depending on each other:
+
+```
+set_dependency(todo_id="A", depends_on_id="B")  # OK: A depends on B
+set_dependency(todo_id="B", depends_on_id="A")  # ERROR: Would create B -> A -> B cycle
+```
+
+**Transitive cycle** -- longer chain:
+
+```
+set_dependency(todo_id="B", depends_on_id="A")  # OK: B depends on A
+set_dependency(todo_id="C", depends_on_id="B")  # OK: C depends on B
+set_dependency(todo_id="A", depends_on_id="C")  # ERROR: A -> C -> B -> A cycle
+```
+
+**Diamond dependencies** -- allowed (no cycle):
 
 ```
      Task A
@@ -118,6 +202,21 @@ Task B    Task C
     \      /
      Task D
 ```
+
+```python
+# D depends on both B and C -- this is fine
+set_dependency(todo_id="D", depends_on_id="B")  # OK
+set_dependency(todo_id="D", depends_on_id="C")  # OK
+
+# B and C both depend on A -- also fine
+set_dependency(todo_id="B", depends_on_id="A")  # OK
+set_dependency(todo_id="C", depends_on_id="A")  # OK
+```
+
+!!! tip
+    Diamond dependencies are the most common pattern for tasks that converge.
+    For example, "Deploy" depends on both "Build Frontend" and "Build Backend",
+    which both depend on "Design Architecture".
 
 ## Hierarchical View
 

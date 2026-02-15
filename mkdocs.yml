@@ -155,6 +155,8 @@ nav:
       - examples/async-storage.md
     - Storage:
       - examples/postgres.md
+      - examples/multi-tenancy.md
+      - examples/migration-guide.md
     - Features:
       - examples/subtasks.md
       - examples/events.md
