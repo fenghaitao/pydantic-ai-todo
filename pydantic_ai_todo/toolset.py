@@ -901,7 +901,7 @@ def get_todo_system_prompt(storage: TodoStorageProtocol | None = None) -> str:
             "completed": "[x]",
             "blocked": "[!]",
         }.get(todo.status, "[ ]")
-        lines.append(f"- {status_icon} {todo.content}")
+        lines.append(f"- {status_icon} [{todo.id}] {todo.content}")
 
     return "\n".join(lines)
 
@@ -933,6 +933,6 @@ async def get_todo_system_prompt_async(
             "completed": "[x]",
             "blocked": "[!]",
         }.get(todo.status, "[ ]")
-        lines.append(f"- {status_icon} {todo.content}")
+        lines.append(f"- {status_icon} [{todo.id}] {todo.content}")
 
     return "\n".join(lines)

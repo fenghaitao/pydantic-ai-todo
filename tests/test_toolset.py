@@ -251,9 +251,12 @@ class TestGetTodoSystemPrompt:
 
         prompt = get_todo_system_prompt(storage)
 
-        assert "[ ] Pending" in prompt
-        assert "[*] In Progress" in prompt
-        assert "[x] Completed" in prompt
+        assert "[ ]" in prompt
+        assert "Pending" in prompt
+        assert "[*]" in prompt
+        assert "In Progress" in prompt
+        assert "[x]" in prompt
+        assert "Completed" in prompt
 
 
 class TestAddTodo:
@@ -627,9 +630,12 @@ class TestGetTodoSystemPromptAsync:
 
         prompt = await get_todo_system_prompt_async(storage)
 
-        assert "[ ] Pending" in prompt
-        assert "[*] In Progress" in prompt
-        assert "[x] Completed" in prompt
+        assert "[ ]" in prompt
+        assert "Pending" in prompt
+        assert "[*]" in prompt
+        assert "In Progress" in prompt
+        assert "[x]" in prompt
+        assert "Completed" in prompt
 
 
 class TestSubtasksEnabled:
