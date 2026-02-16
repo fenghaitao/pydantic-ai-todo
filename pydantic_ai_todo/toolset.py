@@ -448,7 +448,8 @@ def _create_sync_toolset(
             Args:
                 parent_id: The ID of the parent todo.
                 content: The task description in imperative form.
-                active_form: Present continuous form of the content, e.g. "Create endpoint" → "Creating endpoint".
+                active_form: Present continuous form of the content,
+                    e.g. "Create endpoint" → "Creating endpoint".
 
             Returns:
                 Confirmation message with the new subtask's ID or error.
@@ -791,7 +792,8 @@ def _create_async_toolset(
             Args:
                 parent_id: The ID of the parent todo.
                 content: The task description in imperative form.
-                active_form: Present continuous form of the content, e.g. "Create endpoint" → "Creating endpoint".
+                active_form: Present continuous form of the content,
+                    e.g. "Create endpoint" → "Creating endpoint".
 
             Returns:
                 Confirmation message with the new subtask's ID or error.
