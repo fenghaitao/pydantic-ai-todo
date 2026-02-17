@@ -69,6 +69,10 @@ Add a single new todo item to the list.
 
 Use this tool to add a new task without replacing existing todos.
 Returns the ID of the newly created todo.
+
+The `active_form` parameter is the present-continuous version of the task content,
+used as a status label while the task is being worked on.
+Generate it yourself from the content — e.g. "Fix the login bug" → "Fixing the login bug".
 """
 
 UPDATE_TODO_STATUS_DESCRIPTION = """
@@ -91,6 +95,10 @@ Add a subtask to an existing todo.
 Use this tool to break down a task into smaller subtasks.
 The subtask will be linked to its parent via parent_id.
 Returns the ID of the newly created subtask.
+
+The `active_form` parameter is the present-continuous version of the task content,
+used as a status label while the task is being worked on.
+Generate it yourself from the content — e.g. "Create login endpoint" → "Creating login endpoint".
 """
 
 SET_DEPENDENCY_DESCRIPTION = """
@@ -377,7 +385,7 @@ def _create_sync_toolset(
 
         Args:
             content: The task description in imperative form.
-            active_form: Present continuous form shown during execution.
+            active_form: Present continuous form of the content, e.g. "Fix bug" → "Fixing bug".
 
         Returns:
             Confirmation message with the new todo's ID.
@@ -440,7 +448,8 @@ def _create_sync_toolset(
             Args:
                 parent_id: The ID of the parent todo.
                 content: The task description in imperative form.
-                active_form: Present continuous form shown during execution.
+                active_form: Present continuous form of the content,
+                    e.g. "Create endpoint" → "Creating endpoint".
 
             Returns:
                 Confirmation message with the new subtask's ID or error.
@@ -717,7 +726,7 @@ def _create_async_toolset(
 
         Args:
             content: The task description in imperative form.
-            active_form: Present continuous form shown during execution.
+            active_form: Present continuous form of the content, e.g. "Fix bug" → "Fixing bug".
 
         Returns:
             Confirmation message with the new todo's ID.
@@ -783,7 +792,8 @@ def _create_async_toolset(
             Args:
                 parent_id: The ID of the parent todo.
                 content: The task description in imperative form.
-                active_form: Present continuous form shown during execution.
+                active_form: Present continuous form of the content,
+                    e.g. "Create endpoint" → "Creating endpoint".
 
             Returns:
                 Confirmation message with the new subtask's ID or error.
@@ -901,7 +911,7 @@ def get_todo_system_prompt(storage: TodoStorageProtocol | None = None) -> str:
             "completed": "[x]",
             "blocked": "[!]",
         }.get(todo.status, "[ ]")
-        lines.append(f"- {status_icon} {todo.content}")
+        lines.append(f"- {status_icon} [{todo.id}] {todo.content}")
 
     return "\n".join(lines)
 
@@ -933,6 +943,6 @@ async def get_todo_system_prompt_async(
             "completed": "[x]",
             "blocked": "[!]",
         }.get(todo.status, "[ ]")
-        lines.append(f"- {status_icon} {todo.content}")
+        lines.append(f"- {status_icon} [{todo.id}] {todo.content}")
 
     return "\n".join(lines)
