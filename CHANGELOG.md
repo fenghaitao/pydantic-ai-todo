@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-02-16
+
+### Fixed
+
+- **System prompt now includes todo IDs**: `get_todo_system_prompt()` and `get_todo_system_prompt_async()` now render todos as `- [x] [abc123ef] Task content` instead of `- [x] Task content`. Previously, agents could see their todos in the system prompt but had no way to know the IDs needed by `update_todo_status` and `remove_todo` without first calling `read_todos`. ([#9](https://github.com/vstorm-co/pydantic-ai-todo/pull/9) by [@pedro-at-noxus](https://github.com/pedro-at-noxus))
+
+- **Improved `active_form` parameter descriptions**: Added concrete transformation examples (e.g., "Fix the login bug" → "Fixing the login bug") to `add_todo` and `add_subtask` tool descriptions and docstrings. Some models previously asked the user for this value instead of generating it from the task content. ([#9](https://github.com/vstorm-co/pydantic-ai-todo/pull/9) by [@pedro-at-noxus](https://github.com/pedro-at-noxus))
+
 ## [0.1.7] - 2026-02-15
 
 ### Added
