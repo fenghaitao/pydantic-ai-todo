@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-02-24
+
+### Changed
+
+- **Enriched all tool description constants** — All 9 description constants (`TODO_TOOL_DESCRIPTION`, `TODO_SYSTEM_PROMPT`, `READ_TODO_DESCRIPTION`, `ADD_TODO_DESCRIPTION`, `UPDATE_TODO_STATUS_DESCRIPTION`, `REMOVE_TODO_DESCRIPTION`, `ADD_SUBTASK_DESCRIPTION`, `SET_DEPENDENCY_DESCRIPTION`, `GET_AVAILABLE_TASKS_DESCRIPTION`) rewritten with detailed "When to Use" / "When NOT to Use" sections, status workflow documentation, parameter explanations, and practical tips. Follows the Claude Code / deepagents pattern of putting comprehensive guidance directly in tool descriptions.
+- **Expanded `TODO_SYSTEM_PROMPT`** — Tool listing now includes brief usage guidance for each tool. Added "Task Workflow" section with numbered steps.
+
 ## [0.1.8] - 2026-02-16
 
 ### Fixed
