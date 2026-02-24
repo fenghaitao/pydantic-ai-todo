@@ -13,108 +13,215 @@ from pydantic_ai_todo.storage import (
 )
 from pydantic_ai_todo.types import Todo, TodoItem
 
-TODO_TOOL_DESCRIPTION = """
-Use this tool to create and manage a structured task list for your current session.
-This helps you track progress, organize complex tasks, and demonstrate thoroughness.
+TODO_TOOL_DESCRIPTION = """\
+Use this tool to create and manage a structured task list for your current session. \
+This helps you track progress, organize complex tasks, and demonstrate thoroughness \
+to the user. It also helps the user understand your progress on their requests.
 
 ## When to Use This Tool
-Use this tool in these scenarios:
-1. Complex multi-step tasks - When a task requires 3 or more distinct steps
-2. Non-trivial tasks - Tasks that require careful planning
-3. User provides multiple tasks - When users provide a list of things to be done
-4. After receiving new instructions - Capture user requirements as todos
-5. When starting a task - Mark it as in_progress BEFORE beginning work
-6. After completing a task - Mark it as completed immediately
 
-## Task States
-- pending: Task not yet started
-- in_progress: Currently working on (limit to ONE at a time)
-- completed: Task finished successfully
+Use this tool proactively in these scenarios:
 
-## Important
-- Exactly ONE task should be in_progress at any time
+- **Complex multi-step tasks** — When a task requires 3 or more distinct steps or actions
+- **Non-trivial tasks** — Tasks that require careful planning or multiple operations
+- **User provides multiple tasks** — When users provide a list of things to be done \
+(numbered or comma-separated)
+- **After receiving new instructions** — Immediately capture user requirements as tasks
+- **When you start working on a task** — Mark it as in_progress BEFORE beginning work
+- **After completing a task** — Mark it as completed and add any new follow-up tasks \
+discovered during implementation
+
+## When NOT to Use This Tool
+
+Skip using this tool when:
+- There is only a single, straightforward task
+- The task is trivial and tracking it provides no organizational benefit
+- The task can be completed in less than 3 trivial steps
+- The task is purely conversational or informational
+
+NOTE: Do not use this tool if there is only one trivial task to do. \
+Just do the task directly.
+
+## Task Fields
+
+- **content**: A brief, actionable title in imperative form \
+(e.g., "Fix authentication bug in login flow")
+- **active_form**: Present continuous form shown as a status label when the task \
+is in_progress (e.g., "Fixing authentication bug"). Always provide this when \
+creating tasks. The content should be imperative ("Run tests") while active_form \
+should be present continuous ("Running tests").
+- **status**: pending (not started), in_progress (working now), completed (done)
+
+## Status Workflow
+
+Status progresses: `pending` → `in_progress` → `completed`
+
+- Exactly ONE task should be `in_progress` at any time
 - Mark tasks complete IMMEDIATELY after finishing (don't batch completions)
-- If you encounter blockers, keep the task as in_progress and create a new task for the blocker
+- ONLY mark a task as completed when you have FULLY accomplished it
+- If you encounter errors, blockers, or cannot finish, keep the task as in_progress
+- When blocked, create a new task describing what needs to be resolved
+- Never mark a task as completed if:
+  - Tests are failing
+  - Implementation is partial
+  - You encountered unresolved errors
+
+## Tips
+
+- Create tasks with clear, specific content that describes the outcome
+- After completing a task, check for newly unblocked work or start the next available task
+- Prefer working on tasks in creation order when multiple tasks are available, \
+as earlier tasks often set up context for later ones
 """
 
-TODO_SYSTEM_PROMPT = """
+TODO_SYSTEM_PROMPT = """\
 ## Task Management
 
 You have access to todo tools to track your tasks:
-- `read_todos` - View current tasks with their IDs and statuses
-- `write_todos` - Replace the entire todo list
-- `add_todo` - Add a single new task
-- `update_todo_status` - Change a task's status by ID
-- `remove_todo` - Delete a task by ID
+- `read_todos` — View current tasks with their IDs and statuses. \
+Use this to check what's available before deciding what to work on next.
+- `write_todos` — Replace the entire todo list. Use this to initialize or \
+restructure the full task list.
+- `add_todo` — Add a single new task without replacing existing todos. \
+Preferred over write_todos when adding one task.
+- `update_todo_status` — Change a task's status by ID. \
+Use when starting (→ in_progress) or finishing (→ completed) a task.
+- `remove_todo` — Delete a task by ID. Use for tasks that are no longer \
+needed or were created in error.
 
-When working on tasks:
-1. Break down complex tasks into smaller steps
-2. Mark exactly one task as in_progress at a time
-3. Mark tasks as completed immediately after finishing
+### Task Workflow
+1. Break down complex tasks into smaller, actionable steps
+2. Mark exactly one task as `in_progress` at a time
+3. Mark tasks as `completed` immediately after finishing — don't batch completions
+4. After completing a task, call `read_todos` to find the next task to work on
+5. Prefer working on tasks in order — earlier tasks often set up context for later ones
+6. If a task turns out to be impossible or irrelevant, remove it and explain why
 """
 
-READ_TODO_DESCRIPTION = """
+READ_TODO_DESCRIPTION = """\
 Read the current todo list state.
 
-Use this tool to check the current status of all tasks before:
-- Deciding what to work on next
-- Updating task statuses
-- Reporting progress to the user
+## When to Use This Tool
 
-Returns all todos with their ID, current status (pending, in_progress, completed), and content.
+- To see what tasks are available to work on (status: pending, not blocked)
+- To check overall progress on the project
+- After completing a task, to find the next task to work on
+- Before reporting progress to the user
+
+## Output
+
+Returns a summary of each task:
+- **id**: Task identifier (use with update_todo_status, remove_todo)
+- **content**: Brief description of the task
+- **status**: pending, in_progress, or completed
+
+Use read_todos before starting any task to ensure you're working on \
+the right thing and to avoid duplicating work.
 """
 
-ADD_TODO_DESCRIPTION = """
-Add a single new todo item to the list.
+ADD_TODO_DESCRIPTION = """\
+Add a single new todo item to the list without replacing existing todos.
 
-Use this tool to add a new task without replacing existing todos.
-Returns the ID of the newly created todo.
+Preferred over write_todos when you only need to add one task.
 
-The `active_form` parameter is the present-continuous version of the task content,
-used as a status label while the task is being worked on.
-Generate it yourself from the content — e.g. "Fix the login bug" → "Fixing the login bug".
+## Parameters
+- **content**: A brief, actionable title in imperative form \
+(e.g., "Fix authentication bug in login flow"). Should describe the outcome.
+- **active_form**: Present continuous form shown as a status label when \
+the task is in_progress (e.g., "Fixing authentication bug"). \
+Generate it from the content — "Fix X" → "Fixing X", "Add Y" → "Adding Y".
+
+## Tips
+- Always provide active_form — it's displayed to the user while you work on the task
+- Content should be imperative ("Run tests") while active_form should be present \
+continuous ("Running tests")
+- All tasks are created with status `pending`
 """
 
-UPDATE_TODO_STATUS_DESCRIPTION = """
+UPDATE_TODO_STATUS_DESCRIPTION = """\
 Update the status of an existing todo by its ID.
 
-Use this tool to change a todo's status to pending, in_progress, or completed.
-Returns confirmation or error if the todo is not found.
+## When to Use This Tool
+
+- **Mark tasks as in_progress** when you START working on them (before writing code)
+- **Mark tasks as completed** when you have FULLY accomplished the task
+- **Reset to pending** if you need to defer a task
+
+## Status Workflow
+
+Status progresses: `pending` → `in_progress` → `completed`
+
+## Important
+
+- ONLY mark a task as completed when you have FULLY accomplished it
+- If you encounter errors, blockers, or cannot finish, keep the task as in_progress
+- Never mark a task as completed if tests are failing or implementation is partial
+- After marking a task as completed, call read_todos to find the next task
+
+## Staleness
+
+Make sure to read the current todo list (read_todos) before updating \
+to ensure you're updating the correct task.
 """
 
-REMOVE_TODO_DESCRIPTION = """
+REMOVE_TODO_DESCRIPTION = """\
 Remove a todo from the list by its ID.
 
-Use this tool to delete a task that is no longer needed.
-Returns confirmation or error if the todo is not found.
+## When to Use This Tool
+
+- When a task is no longer relevant or was created in error
+- When a task has been superseded by another approach
+- When you determine a task is unnecessary after investigation
+
+Do NOT use this to mark completed tasks — use update_todo_status instead. \
+Removing permanently deletes the task.
 """
 
-ADD_SUBTASK_DESCRIPTION = """
-Add a subtask to an existing todo.
+ADD_SUBTASK_DESCRIPTION = """\
+Add a subtask to an existing todo, creating a parent-child relationship.
 
-Use this tool to break down a task into smaller subtasks.
-The subtask will be linked to its parent via parent_id.
-Returns the ID of the newly created subtask.
+Use this tool to break down a complex task into smaller, actionable steps. \
+The subtask will be linked to its parent via parent_id and displayed in \
+hierarchical views.
 
-The `active_form` parameter is the present-continuous version of the task content,
-used as a status label while the task is being worked on.
-Generate it yourself from the content — e.g. "Create login endpoint" → "Creating login endpoint".
+## Parameters
+- **parent_id**: The ID of the parent todo (must exist)
+- **content**: Actionable title in imperative form (e.g., "Create login endpoint")
+- **active_form**: Present continuous form for status display \
+(e.g., "Creating login endpoint")
+
+## Tips
+- Break large tasks into 3-7 subtasks for best results
+- Subtasks should be independently completable
+- Complete subtasks before marking the parent as completed
 """
 
-SET_DEPENDENCY_DESCRIPTION = """
+SET_DEPENDENCY_DESCRIPTION = """\
 Set a dependency between two todos.
 
-Use this tool to specify that one task depends on another.
-The dependent task will be blocked until its dependency is completed.
-Returns confirmation or error if validation fails.
+Use this tool to specify that one task must wait for another to complete \
+before it can be started. The dependent task will be automatically marked \
+as 'blocked' until its dependency is completed.
+
+## Parameters
+- **todo_id**: The task that DEPENDS on another (will be blocked)
+- **depends_on_id**: The task that must complete FIRST (the prerequisite)
+
+## Validation
+- Cannot create self-dependencies (A depends on A)
+- Cannot create circular dependencies (A→B→A)
+- Duplicate dependencies are rejected
 """
 
-GET_AVAILABLE_TASKS_DESCRIPTION = """
-Get all tasks that can be worked on now.
+GET_AVAILABLE_TASKS_DESCRIPTION = """\
+Get all tasks that can be worked on now (no blocking dependencies).
 
-Returns only tasks that have no incomplete dependencies.
-Blocked tasks are excluded from the list.
-Use this to decide what to work on next.
+Returns only tasks whose dependencies are all completed. \
+Blocked and completed tasks are excluded from the list.
+
+Use this to decide what to work on next, especially when tasks have \
+complex dependency chains. Prefer working on tasks in order — earlier \
+tasks often set up context for later ones.
 """
 
 
