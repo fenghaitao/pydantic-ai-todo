@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2026-02-26
+
+### Added
+
+- **Custom tool descriptions** — `create_todo_toolset()` now accepts `descriptions: dict[str, str] | None` parameter to override any tool's built-in description. Enables customizing agent behavior without forking the library ([#11](https://github.com/vstorm-co/pydantic-ai-todo/issues/11))
+
 ## [0.1.9] - 2026-02-24
 
 ### Changed

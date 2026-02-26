@@ -64,6 +64,26 @@ toolset = create_todo_toolset(
 )
 ```
 
+### With Custom Tool Descriptions
+
+Override default tool descriptions to steer LLM behavior for your use case:
+
+```python
+from pydantic_ai_todo import create_todo_toolset
+
+toolset = create_todo_toolset(
+    descriptions={
+        "write_todos": "Plan and organize complex multi-step tasks only",
+        "read_todos": "Check current task list and progress",
+    }
+)
+```
+
+Any tool name not present in the dict keeps its default description.
+Available tool names: `read_todos`, `write_todos`, `add_todo`,
+`update_todo_status`, `remove_todo`, `add_subtask`, `set_dependency`,
+`get_available_tasks`.
+
 ### System Prompt Generation
 
 ```python

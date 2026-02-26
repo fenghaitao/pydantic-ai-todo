@@ -166,6 +166,21 @@ storage = AsyncMemoryStorage(event_emitter=emitter)
 toolset = create_todo_toolset(async_storage=storage)
 ```
 
+## Custom Tool Descriptions
+
+Override default tool descriptions for better LLM behavior in your use case:
+
+```python
+toolset = create_todo_toolset(
+    descriptions={
+        "write_todos": "Plan and organize complex multi-step tasks only",
+        "read_todos": "Check current task list and progress",
+    }
+)
+```
+
+Pass a `descriptions` dict mapping tool names to custom description strings. Any tool not listed keeps its default description. Available tool names: `read_todos`, `write_todos`, `add_todo`, `update_todo_status`, `remove_todo`, `add_subtask`, `set_dependency`, `get_available_tasks`.
+
 ## API Reference
 
 ### Factory Functions
