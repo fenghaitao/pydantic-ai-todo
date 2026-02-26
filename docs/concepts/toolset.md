@@ -121,6 +121,26 @@ Use the todo tools to:
 )
 ```
 
+## Custom Tool Descriptions
+
+The `descriptions` parameter lets you override default tool descriptions to better
+guide LLM behavior for your specific use case. Pass a dict mapping tool names to
+custom description strings:
+
+```python
+toolset = create_todo_toolset(
+    descriptions={
+        "write_todos": "Plan and organize complex multi-step tasks only",
+        "read_todos": "Check current task list and progress",
+    }
+)
+```
+
+Any tool name not included in the dict keeps its default description. Available
+tool names for the core tools: `read_todos`, `write_todos`, `add_todo`,
+`update_todo_status`, `remove_todo`. When `enable_subtasks=True`, you can also
+override: `add_subtask`, `set_dependency`, `get_available_tasks`.
+
 ## Factory Parameters
 
 ```python
@@ -130,6 +150,7 @@ def create_todo_toolset(
     async_storage: AsyncTodoStorageProtocol | None = None,
     id: str | None = None,
     enable_subtasks: bool = False,
+    descriptions: dict[str, str] | None = None,
 ) -> FunctionToolset[Any]:
     """Create a todo toolset.
 
@@ -138,6 +159,9 @@ def create_todo_toolset(
         async_storage: Async storage backend (e.g., AsyncMemoryStorage)
         id: Optional toolset identifier
         enable_subtasks: Enable subtask and dependency tools
+        descriptions: Optional dict mapping tool names to custom descriptions.
+            Override any tool's description to steer LLM behavior.
+            Tool names not present in the dict keep their defaults.
 
     Returns:
         A FunctionToolset with todo management tools

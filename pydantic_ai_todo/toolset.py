@@ -231,6 +231,7 @@ def create_todo_toolset(
     async_storage: AsyncTodoStorageProtocol | None = None,
     id: str | None = None,
     enable_subtasks: bool = False,
+    descriptions: dict[str, str] | None = None,
 ) -> FunctionToolset[Any]:
     """Create a todo toolset for task management.
 
@@ -250,6 +251,11 @@ def create_todo_toolset(
             - get_available_tasks: Get tasks without blocking dependencies
             - Hierarchical view in read_todos
             - 'blocked' status for tasks with incomplete dependencies
+        descriptions: Optional dict mapping tool names to custom descriptions.
+            Override any tool's description by providing its name as key.
+            Tool names: ``read_todos``, ``write_todos``, ``add_todo``,
+            ``update_todo_status``, ``remove_todo``, ``add_subtask``,
+            ``set_dependency``, ``get_available_tasks``.
 
     Returns:
         FunctionToolset compatible with any pydantic-ai agent.
@@ -285,19 +291,33 @@ def create_todo_toolset(
         todos = await storage.get_todos()
         ```
 
-    Example (with subtasks enabled):
+    Example (with custom descriptions):
         ```python
         from pydantic_ai_todo import create_todo_toolset
 
-        toolset = create_todo_toolset(enable_subtasks=True)
-        # Now includes add_subtask, set_dependency, get_available_tasks tools
+        toolset = create_todo_toolset(
+            descriptions={
+                "write_todos": "Only use for tasks with 5+ steps.",
+            }
+        )
         ```
     """
+    _descs = descriptions or {}
     # Use async storage if provided, otherwise fall back to sync storage
     if async_storage is not None:
-        return _create_async_toolset(async_storage, id=id, enable_subtasks=enable_subtasks)
+        return _create_async_toolset(
+            async_storage,
+            id=id,
+            enable_subtasks=enable_subtasks,
+            descriptions=_descs,
+        )
     else:
-        return _create_sync_toolset(storage, id=id, enable_subtasks=enable_subtasks)
+        return _create_sync_toolset(
+            storage,
+            id=id,
+            enable_subtasks=enable_subtasks,
+            descriptions=_descs,
+        )
 
 
 def _create_sync_toolset(
@@ -305,9 +325,11 @@ def _create_sync_toolset(
     *,
     id: str | None = None,
     enable_subtasks: bool = False,
+    descriptions: dict[str, str] | None = None,
 ) -> FunctionToolset[Any]:
     """Create toolset with sync storage (backwards compatible)."""
     _storage = storage if storage is not None else TodoStorage()
+    _descs = descriptions or {}
 
     toolset: FunctionToolset[Any] = FunctionToolset(id=id)
 
@@ -385,7 +407,8 @@ def _create_sync_toolset(
         return "\n".join(lines)
 
     if enable_subtasks:
-        read_description = READ_TODO_DESCRIPTION + "\nSet hierarchical=True to view as tree."
+        _default_read = READ_TODO_DESCRIPTION + "\nSet hierarchical=True to view as tree."
+        read_description = _descs.get("read_todos", _default_read)
 
         @toolset.tool(description=read_description)
         async def read_todos(hierarchical: bool = False) -> str:  # pyright: ignore[reportRedeclaration]
@@ -424,7 +447,7 @@ def _create_sync_toolset(
             return result + f"\n\nSummary: {', '.join(summary_parts)}"
     else:
 
-        @toolset.tool(description=READ_TODO_DESCRIPTION)
+        @toolset.tool(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
         async def read_todos() -> str:  # pyright: ignore[reportRedeclaration]
             """Read the current todo list."""
             if not _storage.todos:
@@ -449,7 +472,7 @@ def _create_sync_toolset(
 
             return "\n".join(lines)
 
-    @toolset.tool(description=TODO_TOOL_DESCRIPTION)
+    @toolset.tool(description=_descs.get("write_todos", TODO_TOOL_DESCRIPTION))
     async def write_todos(todos: list[TodoItem]) -> str:
         """Update the todo list with new items.
 
@@ -486,7 +509,7 @@ def _create_sync_toolset(
 
         return f"Updated {len(todos)} todos: {', '.join(summary_parts)}"
 
-    @toolset.tool(description=ADD_TODO_DESCRIPTION)
+    @toolset.tool(description=_descs.get("add_todo", ADD_TODO_DESCRIPTION))
     async def add_todo(content: str, active_form: str) -> str:
         """Add a new todo item to the list.
 
@@ -501,7 +524,7 @@ def _create_sync_toolset(
         _storage.todos = [*_storage.todos, new_todo]
         return f"Added todo '{content}' with ID: {new_todo.id}"
 
-    @toolset.tool(description=UPDATE_TODO_STATUS_DESCRIPTION)
+    @toolset.tool(description=_descs.get("update_todo_status", UPDATE_TODO_STATUS_DESCRIPTION))
     async def update_todo_status(todo_id: str, status: str) -> str:
         """Update the status of an existing todo.
 
@@ -528,7 +551,7 @@ def _create_sync_toolset(
 
         return f"Todo with ID '{todo_id}' not found"
 
-    @toolset.tool(description=REMOVE_TODO_DESCRIPTION)
+    @toolset.tool(description=_descs.get("remove_todo", REMOVE_TODO_DESCRIPTION))
     async def remove_todo(todo_id: str) -> str:
         """Remove a todo from the list.
 
@@ -548,7 +571,7 @@ def _create_sync_toolset(
     # Add subtask-related tools only when enabled
     if enable_subtasks:
 
-        @toolset.tool(description=ADD_SUBTASK_DESCRIPTION)
+        @toolset.tool(description=_descs.get("add_subtask", ADD_SUBTASK_DESCRIPTION))
         async def add_subtask(parent_id: str, content: str, active_form: str) -> str:
             """Add a subtask to an existing todo.
 
@@ -574,7 +597,7 @@ def _create_sync_toolset(
             _storage.todos = [*_storage.todos, new_todo]
             return f"Added subtask '{content}' with ID: {new_todo.id} (parent: {parent_id})"
 
-        @toolset.tool(description=SET_DEPENDENCY_DESCRIPTION)
+        @toolset.tool(description=_descs.get("set_dependency", SET_DEPENDENCY_DESCRIPTION))
         async def set_dependency(todo_id: str, depends_on_id: str) -> str:
             """Set a dependency between two todos.
 
@@ -614,7 +637,9 @@ def _create_sync_toolset(
 
             return f"Added dependency: '{todo.content}' now depends on '{dependency.content}'"
 
-        @toolset.tool(description=GET_AVAILABLE_TASKS_DESCRIPTION)
+        @toolset.tool(
+            description=_descs.get("get_available_tasks", GET_AVAILABLE_TASKS_DESCRIPTION)
+        )
         async def get_available_tasks() -> str:
             """Get all tasks that can be worked on now.
 
@@ -648,9 +673,11 @@ def _create_async_toolset(
     *,
     id: str | None = None,
     enable_subtasks: bool = False,
+    descriptions: dict[str, str] | None = None,
 ) -> FunctionToolset[Any]:
     """Create toolset with async storage for true persistence."""
     toolset: FunctionToolset[Any] = FunctionToolset(id=id)
+    _descs = descriptions or {}
 
     def _get_status_icon(status: str, enable_subtasks: bool = False) -> str:
         """Get the icon for a todo status."""
@@ -724,7 +751,8 @@ def _create_async_toolset(
         return "\n".join(lines)
 
     if enable_subtasks:
-        read_description = READ_TODO_DESCRIPTION + "\nSet hierarchical=True to view as tree."
+        _default_read = READ_TODO_DESCRIPTION + "\nSet hierarchical=True to view as tree."
+        read_description = _descs.get("read_todos", _default_read)
 
         @toolset.tool(description=read_description)
         async def read_todos(hierarchical: bool = False) -> str:  # pyright: ignore[reportRedeclaration]
@@ -764,7 +792,7 @@ def _create_async_toolset(
             return result + f"\n\nSummary: {', '.join(summary_parts)}"
     else:
 
-        @toolset.tool(description=READ_TODO_DESCRIPTION)
+        @toolset.tool(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
         async def read_todos() -> str:  # pyright: ignore[reportRedeclaration]
             """Read the current todo list."""
             todos = await storage.get_todos()
@@ -790,7 +818,7 @@ def _create_async_toolset(
 
             return "\n".join(lines)
 
-    @toolset.tool(description=TODO_TOOL_DESCRIPTION)
+    @toolset.tool(description=_descs.get("write_todos", TODO_TOOL_DESCRIPTION))
     async def write_todos(todos: list[TodoItem]) -> str:
         """Update the todo list with new items.
 
@@ -827,7 +855,7 @@ def _create_async_toolset(
 
         return f"Updated {len(todos)} todos: {', '.join(summary_parts)}"
 
-    @toolset.tool(description=ADD_TODO_DESCRIPTION)
+    @toolset.tool(description=_descs.get("add_todo", ADD_TODO_DESCRIPTION))
     async def add_todo(content: str, active_form: str) -> str:
         """Add a new todo item to the list.
 
@@ -842,7 +870,7 @@ def _create_async_toolset(
         await storage.add_todo(new_todo)
         return f"Added todo '{content}' with ID: {new_todo.id}"
 
-    @toolset.tool(description=UPDATE_TODO_STATUS_DESCRIPTION)
+    @toolset.tool(description=_descs.get("update_todo_status", UPDATE_TODO_STATUS_DESCRIPTION))
     async def update_todo_status(
         todo_id: str, status: Literal["pending", "in_progress", "completed", "blocked"]
     ) -> str:
@@ -872,7 +900,7 @@ def _create_async_toolset(
             return f"Updated todo '{updated.content}' status to '{status}'"
         return f"Todo with ID '{todo_id}' not found"
 
-    @toolset.tool(description=REMOVE_TODO_DESCRIPTION)
+    @toolset.tool(description=_descs.get("remove_todo", REMOVE_TODO_DESCRIPTION))
     async def remove_todo(todo_id: str) -> str:
         """Remove a todo from the list.
 
@@ -892,7 +920,7 @@ def _create_async_toolset(
     # Add subtask-related tools only when enabled
     if enable_subtasks:
 
-        @toolset.tool(description=ADD_SUBTASK_DESCRIPTION)
+        @toolset.tool(description=_descs.get("add_subtask", ADD_SUBTASK_DESCRIPTION))
         async def add_subtask(parent_id: str, content: str, active_form: str) -> str:
             """Add a subtask to an existing todo.
 
@@ -918,7 +946,7 @@ def _create_async_toolset(
             await storage.add_todo(new_todo)
             return f"Added subtask '{content}' with ID: {new_todo.id} (parent: {parent_id})"
 
-        @toolset.tool(description=SET_DEPENDENCY_DESCRIPTION)
+        @toolset.tool(description=_descs.get("set_dependency", SET_DEPENDENCY_DESCRIPTION))
         async def set_dependency(todo_id: str, depends_on_id: str) -> str:
             """Set a dependency between two todos.
 
@@ -964,7 +992,9 @@ def _create_async_toolset(
 
             return f"Added dependency: '{todo.content}' now depends on '{dependency.content}'"
 
-        @toolset.tool(description=GET_AVAILABLE_TASKS_DESCRIPTION)
+        @toolset.tool(
+            description=_descs.get("get_available_tasks", GET_AVAILABLE_TASKS_DESCRIPTION)
+        )
         async def get_available_tasks() -> str:
             """Get all tasks that can be worked on now.
 
