@@ -86,8 +86,10 @@ class TestTodoCapability:
 
         storage._todos = [
             TodoItem(
-                id="1", content="Write tests",
-                status="in_progress", active_form="Writing tests",
+                id="1",
+                content="Write tests",
+                status="in_progress",
+                active_form="Writing tests",
             )
         ]
         result = instructions_fn(ctx)
