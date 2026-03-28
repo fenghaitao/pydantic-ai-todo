@@ -142,6 +142,7 @@ nav:
   - Getting Help: getting-help.md
   - Core Concepts:
     - concepts/index.md
+    - Capability: concepts/capability.md
     - Toolset: concepts/toolset.md
     - Storage: concepts/storage.md
     - Types: concepts/types.md
@@ -162,6 +163,7 @@ nav:
       - examples/events.md
   - API Reference:
     - api/index.md
+    - Capability: api/capability.md
     - Toolset: api/toolset.md
     - Storage: api/storage.md
     - Types: api/types.md

@@ -410,7 +410,7 @@ def _create_sync_toolset(
         _default_read = READ_TODO_DESCRIPTION + "\nSet hierarchical=True to view as tree."
         read_description = _descs.get("read_todos", _default_read)
 
-        @toolset.tool(description=read_description)
+        @toolset.tool_plain(description=read_description)
         async def read_todos(hierarchical: bool = False) -> str:  # pyright: ignore[reportRedeclaration]
             """Read the current todo list.
 
@@ -444,10 +444,18 @@ def _create_sync_toolset(
             summary_parts.append(f"{counts['in_progress']} in progress")
             summary_parts.append(f"{counts['pending']} pending")
 
-            return result + f"\n\nSummary: {', '.join(summary_parts)}"
+            summary = f"\n\nSummary: {', '.join(summary_parts)}"
+
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                summary += (
+                    "\n\nAll tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
+
+            return result + summary
     else:
 
-        @toolset.tool(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
+        @toolset.tool_plain(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
         async def read_todos() -> str:  # pyright: ignore[reportRedeclaration]
             """Read the current todo list."""
             if not _storage.todos:
@@ -470,9 +478,16 @@ def _create_sync_toolset(
                 f"{counts['pending']} pending"
             )
 
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                lines.append("")
+                lines.append(
+                    "All tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
+
             return "\n".join(lines)
 
-    @toolset.tool(description=_descs.get("write_todos", TODO_TOOL_DESCRIPTION))
+    @toolset.tool_plain(description=_descs.get("write_todos", TODO_TOOL_DESCRIPTION))
     async def write_todos(todos: list[TodoItem]) -> str:
         """Update the todo list with new items.
 
@@ -509,7 +524,7 @@ def _create_sync_toolset(
 
         return f"Updated {len(todos)} todos: {', '.join(summary_parts)}"
 
-    @toolset.tool(description=_descs.get("add_todo", ADD_TODO_DESCRIPTION))
+    @toolset.tool_plain(description=_descs.get("add_todo", ADD_TODO_DESCRIPTION))
     async def add_todo(content: str, active_form: str) -> str:
         """Add a new todo item to the list.
 
@@ -524,7 +539,9 @@ def _create_sync_toolset(
         _storage.todos = [*_storage.todos, new_todo]
         return f"Added todo '{content}' with ID: {new_todo.id}"
 
-    @toolset.tool(description=_descs.get("update_todo_status", UPDATE_TODO_STATUS_DESCRIPTION))
+    @toolset.tool_plain(
+        description=_descs.get("update_todo_status", UPDATE_TODO_STATUS_DESCRIPTION),
+    )
     async def update_todo_status(todo_id: str, status: str) -> str:
         """Update the status of an existing todo.
 
@@ -551,7 +568,7 @@ def _create_sync_toolset(
 
         return f"Todo with ID '{todo_id}' not found"
 
-    @toolset.tool(description=_descs.get("remove_todo", REMOVE_TODO_DESCRIPTION))
+    @toolset.tool_plain(description=_descs.get("remove_todo", REMOVE_TODO_DESCRIPTION))
     async def remove_todo(todo_id: str) -> str:
         """Remove a todo from the list.
 
@@ -571,7 +588,7 @@ def _create_sync_toolset(
     # Add subtask-related tools only when enabled
     if enable_subtasks:
 
-        @toolset.tool(description=_descs.get("add_subtask", ADD_SUBTASK_DESCRIPTION))
+        @toolset.tool_plain(description=_descs.get("add_subtask", ADD_SUBTASK_DESCRIPTION))
         async def add_subtask(parent_id: str, content: str, active_form: str) -> str:
             """Add a subtask to an existing todo.
 
@@ -597,7 +614,7 @@ def _create_sync_toolset(
             _storage.todos = [*_storage.todos, new_todo]
             return f"Added subtask '{content}' with ID: {new_todo.id} (parent: {parent_id})"
 
-        @toolset.tool(description=_descs.get("set_dependency", SET_DEPENDENCY_DESCRIPTION))
+        @toolset.tool_plain(description=_descs.get("set_dependency", SET_DEPENDENCY_DESCRIPTION))
         async def set_dependency(todo_id: str, depends_on_id: str) -> str:
             """Set a dependency between two todos.
 
@@ -637,7 +654,7 @@ def _create_sync_toolset(
 
             return f"Added dependency: '{todo.content}' now depends on '{dependency.content}'"
 
-        @toolset.tool(
+        @toolset.tool_plain(
             description=_descs.get("get_available_tasks", GET_AVAILABLE_TASKS_DESCRIPTION)
         )
         async def get_available_tasks() -> str:
@@ -754,7 +771,7 @@ def _create_async_toolset(
         _default_read = READ_TODO_DESCRIPTION + "\nSet hierarchical=True to view as tree."
         read_description = _descs.get("read_todos", _default_read)
 
-        @toolset.tool(description=read_description)
+        @toolset.tool_plain(description=read_description)
         async def read_todos(hierarchical: bool = False) -> str:  # pyright: ignore[reportRedeclaration]
             """Read the current todo list.
 
@@ -789,10 +806,18 @@ def _create_async_toolset(
             summary_parts.append(f"{counts['in_progress']} in progress")
             summary_parts.append(f"{counts['pending']} pending")
 
-            return result + f"\n\nSummary: {', '.join(summary_parts)}"
+            summary = f"\n\nSummary: {', '.join(summary_parts)}"
+
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                summary += (
+                    "\n\nAll tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
+
+            return result + summary
     else:
 
-        @toolset.tool(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
+        @toolset.tool_plain(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
         async def read_todos() -> str:  # pyright: ignore[reportRedeclaration]
             """Read the current todo list."""
             todos = await storage.get_todos()
@@ -816,9 +841,16 @@ def _create_async_toolset(
                 f"{counts['pending']} pending"
             )
 
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                lines.append("")
+                lines.append(
+                    "All tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
+
             return "\n".join(lines)
 
-    @toolset.tool(description=_descs.get("write_todos", TODO_TOOL_DESCRIPTION))
+    @toolset.tool_plain(description=_descs.get("write_todos", TODO_TOOL_DESCRIPTION))
     async def write_todos(todos: list[TodoItem]) -> str:
         """Update the todo list with new items.
 
@@ -855,7 +887,7 @@ def _create_async_toolset(
 
         return f"Updated {len(todos)} todos: {', '.join(summary_parts)}"
 
-    @toolset.tool(description=_descs.get("add_todo", ADD_TODO_DESCRIPTION))
+    @toolset.tool_plain(description=_descs.get("add_todo", ADD_TODO_DESCRIPTION))
     async def add_todo(content: str, active_form: str) -> str:
         """Add a new todo item to the list.
 
@@ -870,7 +902,9 @@ def _create_async_toolset(
         await storage.add_todo(new_todo)
         return f"Added todo '{content}' with ID: {new_todo.id}"
 
-    @toolset.tool(description=_descs.get("update_todo_status", UPDATE_TODO_STATUS_DESCRIPTION))
+    @toolset.tool_plain(
+        description=_descs.get("update_todo_status", UPDATE_TODO_STATUS_DESCRIPTION),
+    )
     async def update_todo_status(
         todo_id: str, status: Literal["pending", "in_progress", "completed", "blocked"]
     ) -> str:
@@ -900,7 +934,7 @@ def _create_async_toolset(
             return f"Updated todo '{updated.content}' status to '{status}'"
         return f"Todo with ID '{todo_id}' not found"
 
-    @toolset.tool(description=_descs.get("remove_todo", REMOVE_TODO_DESCRIPTION))
+    @toolset.tool_plain(description=_descs.get("remove_todo", REMOVE_TODO_DESCRIPTION))
     async def remove_todo(todo_id: str) -> str:
         """Remove a todo from the list.
 
@@ -920,7 +954,7 @@ def _create_async_toolset(
     # Add subtask-related tools only when enabled
     if enable_subtasks:
 
-        @toolset.tool(description=_descs.get("add_subtask", ADD_SUBTASK_DESCRIPTION))
+        @toolset.tool_plain(description=_descs.get("add_subtask", ADD_SUBTASK_DESCRIPTION))
         async def add_subtask(parent_id: str, content: str, active_form: str) -> str:
             """Add a subtask to an existing todo.
 
@@ -946,7 +980,7 @@ def _create_async_toolset(
             await storage.add_todo(new_todo)
             return f"Added subtask '{content}' with ID: {new_todo.id} (parent: {parent_id})"
 
-        @toolset.tool(description=_descs.get("set_dependency", SET_DEPENDENCY_DESCRIPTION))
+        @toolset.tool_plain(description=_descs.get("set_dependency", SET_DEPENDENCY_DESCRIPTION))
         async def set_dependency(todo_id: str, depends_on_id: str) -> str:
             """Set a dependency between two todos.
 
@@ -992,7 +1026,7 @@ def _create_async_toolset(
 
             return f"Added dependency: '{todo.content}' now depends on '{dependency.content}'"
 
-        @toolset.tool(
+        @toolset.tool_plain(
             description=_descs.get("get_available_tasks", GET_AVAILABLE_TASKS_DESCRIPTION)
         )
         async def get_available_tasks() -> str:
