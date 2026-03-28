@@ -1894,44 +1894,44 @@ class TestAsyncSubtasksToolset:
 class TestReadTodosAllCompletedHint:
     """Tests for the 'all completed' hint in read_todos output."""
 
-    async def test_sync_all_completed_shows_hint(self):
+    async def test_sync_all_completed_shows_hint(self) -> None:
         """Sync read_todos shows 'Do NOT call' hint when all tasks completed."""
         storage = TodoStorage()
         toolset = create_todo_toolset(storage=storage)
 
-        storage._todos = [
-            TodoItem(id="1", content="Done", status="completed", active_form="Done"),
+        storage.todos = [
+            Todo(id="1", content="Done", status="completed", active_form="Done"),
         ]
-        read = toolset.tools["read_todos"]
-        result = await read.function()
+        read_todos = toolset.tools["read_todos"]
+        result = await read_todos.function()  # type: ignore[call-arg]
         assert "Do NOT call read_todos again" in result
 
-    async def test_sync_not_all_completed_no_hint(self):
+    async def test_sync_not_all_completed_no_hint(self) -> None:
         """Sync read_todos does NOT show hint when tasks are pending."""
         storage = TodoStorage()
         toolset = create_todo_toolset(storage=storage)
 
-        storage._todos = [
-            TodoItem(id="1", content="Done", status="completed", active_form="Done"),
-            TodoItem(id="2", content="Todo", status="pending", active_form="Doing"),
+        storage.todos = [
+            Todo(id="1", content="Done", status="completed", active_form="Done"),
+            Todo(id="2", content="Todo", status="pending", active_form="Doing"),
         ]
-        read = toolset.tools["read_todos"]
-        result = await read.function()
+        read_todos = toolset.tools["read_todos"]
+        result = await read_todos.function()  # type: ignore[call-arg]
         assert "Do NOT call read_todos again" not in result
 
-    async def test_sync_subtasks_all_completed_shows_hint(self):
+    async def test_sync_subtasks_all_completed_shows_hint(self) -> None:
         """Sync subtask-enabled read_todos shows hint when all completed."""
         storage = TodoStorage()
         toolset = create_todo_toolset(storage=storage, enable_subtasks=True)
 
-        storage._todos = [
-            TodoItem(id="1", content="Done", status="completed", active_form="Done"),
+        storage.todos = [
+            Todo(id="1", content="Done", status="completed", active_form="Done"),
         ]
-        read = toolset.tools["read_todos"]
-        result = await read.function()
+        read_todos = toolset.tools["read_todos"]
+        result = await read_todos.function()  # type: ignore[call-arg]
         assert "Do NOT call read_todos again" in result
 
-    async def test_async_all_completed_shows_hint(self):
+    async def test_async_all_completed_shows_hint(self) -> None:
         """Async read_todos shows hint when all completed."""
         storage = AsyncMemoryStorage()
         toolset = create_todo_toolset(async_storage=storage)
@@ -1939,11 +1939,11 @@ class TestReadTodosAllCompletedHint:
         todo = Todo(id="1", content="Done", status="completed", active_form="Done")
         await storage.add_todo(todo)
 
-        read = toolset.tools["read_todos"]
-        result = await read.function()
+        read_todos = toolset.tools["read_todos"]
+        result = await read_todos.function()  # type: ignore[call-arg]
         assert "Do NOT call read_todos again" in result
 
-    async def test_async_subtasks_all_completed_shows_hint(self):
+    async def test_async_subtasks_all_completed_shows_hint(self) -> None:
         """Async subtask-enabled read_todos shows hint when all completed."""
         storage = AsyncMemoryStorage()
         toolset = create_todo_toolset(async_storage=storage, enable_subtasks=True)
@@ -1951,6 +1951,6 @@ class TestReadTodosAllCompletedHint:
         todo = Todo(id="1", content="Done", status="completed", active_form="Done")
         await storage.add_todo(todo)
 
-        read = toolset.tools["read_todos"]
-        result = await read.function()
+        read_todos = toolset.tools["read_todos"]
+        result = await read_todos.function()  # type: ignore[call-arg]
         assert "Do NOT call read_todos again" in result
