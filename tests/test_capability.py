@@ -6,7 +6,7 @@ import pytest
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
-from pydantic_ai_todo import TodoCapability, TodoStorage
+from pydantic_ai_todo import Todo, TodoCapability, TodoStorage
 from pydantic_ai_todo.storage import AsyncMemoryStorage
 from pydantic_ai_todo.toolset import TODO_SYSTEM_PROMPT
 
@@ -82,10 +82,8 @@ class TestTodoCapability:
         assert "## Task Management" in result
 
         # Add a todo — should appear in prompt
-        from pydantic_ai_todo.types import TodoItem
-
-        storage._todos = [
-            TodoItem(
+        storage.todos = [
+            Todo(
                 id="1",
                 content="Write tests",
                 status="in_progress",
@@ -117,7 +115,7 @@ class TestTodoCapabilityIntegration:
         # The toolset has the expected tools
         toolset = cap.get_toolset()
         assert toolset is not None
-        tool_names = set(toolset.tools.keys())
+        tool_names = set(toolset.tools.keys())  # type: ignore[union-attr]
         assert "read_todos" in tool_names
         assert "write_todos" in tool_names
         assert "add_todo" in tool_names
@@ -136,7 +134,7 @@ class TestTodoCapabilityIntegration:
 
         toolset = cap.get_toolset()
         assert toolset is not None
-        tool_names = set(toolset.tools.keys())
+        tool_names = set(toolset.tools.keys())  # type: ignore[union-attr]
         assert "add_subtask" in tool_names
         assert "set_dependency" in tool_names
 
