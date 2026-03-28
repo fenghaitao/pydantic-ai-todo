@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-26
+
+### Added
+
+- **`TodoCapability`** — new pydantic-ai [capability](https://ai.pydantic.dev/capabilities/) that bundles todo tools + dynamic system prompt into a single plug-and-play unit. This is now the recommended way to add todo support:
+  ```python
+  from pydantic_ai import Agent
+  from pydantic_ai_todo import TodoCapability
+
+  agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability()])
+  ```
+  - Registers all tools automatically (`read_todos`, `write_todos`, `add_todo`, `update_todo_status`, `remove_todo`, and subtask tools when enabled)
+  - Injects dynamic system prompt showing current todo state — no manual `get_todo_system_prompt()` wiring needed
+  - Supports AgentSpec YAML serialization (`Agent.from_file("agent.yaml")`)
+  - Accepts all `create_todo_toolset()` params: `storage`, `async_storage`, `enable_subtasks`, `descriptions`
+
+### Fixed
+
+- **`read_todos` loop when all tasks completed** — when all tasks are done, `read_todos` now returns an explicit "All tasks are completed. Do NOT call read_todos again" message. Previously the model would keep calling `read_todos` in a loop because the response didn't signal that no further action was needed. ([#14](https://github.com/vstorm-co/pydantic-ai-todo/issues/14), reported by [@ilayu-blip](https://github.com/ilayu-blip))
+
+### Changed
+
+- **Documentation rewritten for capabilities-first approach** — README, quick start, examples, and concept pages now lead with `TodoCapability`. The toolset API (`create_todo_toolset()`) is documented as a lower-level alternative for users who need more control.
+
 ## [0.1.10] - 2026-02-26
 
 ### Added

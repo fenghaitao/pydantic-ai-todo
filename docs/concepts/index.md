@@ -1,40 +1,57 @@
 # Core Concepts
 
-Todo Toolset for Pydantic AI is built around three main concepts:
-
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     Your Agent                          │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │              Todo Toolset                         │  │
-│  │  read_todos │ write_todos │ add_todo │ ...       │  │
-│  └───────────────────────────────────────────────────┘  │
-│                         │                               │
-│                         ▼                               │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │              Storage Backend                      │  │
-│  │  TodoStorage │ AsyncMemoryStorage │ PostgreSQL   │  │
-│  └───────────────────────────────────────────────────┘  │
-│                         │                               │
-│                         ▼                               │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │              Event System (optional)              │  │
-│  │  on_created │ on_completed │ on_updated │ ...    │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                     Your Agent                           │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │           TodoCapability (recommended)             │  │
+│  │  tools + dynamic instructions — auto-configured    │  │
+│  └────────────────────────────────────────────────────┘  │
+│                         │                                │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │              Todo Toolset                          │  │
+│  │  read_todos │ write_todos │ add_todo │ ...        │  │
+│  └────────────────────────────────────────────────────┘  │
+│                         │                                │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │              Storage Backend                       │  │
+│  │  TodoStorage │ AsyncMemoryStorage │ PostgreSQL    │  │
+│  └────────────────────────────────────────────────────┘  │
+│                         │                                │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │              Event System (optional)               │  │
+│  │  on_created │ on_completed │ on_updated │ ...     │  │
+│  └────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ## Key Components
 
-### [Toolset](toolset.md)
+### [TodoCapability](capability.md) (Recommended)
 
-The toolset provides tools for task management:
+The capability bundles tools + dynamic instructions into a single unit:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai_todo import TodoCapability
+
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability()])
+```
+
+- Registers all tools automatically
+- Injects dynamic system prompt with current todo state
+- Supports YAML agent definitions via AgentSpec
+
+### [Toolset](toolset.md) (Lower-level)
+
+The standalone toolset for when you need more control:
 
 - `create_todo_toolset()` — Factory function
 - Tools: `read_todos`, `write_todos`, `add_todo`, etc.
 - Optional subtask tools with `enable_subtasks=True`
+- Requires manual system prompt wiring via `get_todo_system_prompt()`
 
 ### [Storage](storage.md)
 
@@ -54,32 +71,42 @@ Pydantic models for type safety:
 
 ## How It Works
 
-1. **Create toolset** with your preferred storage
-2. **Add to agent** via `toolsets=[...]`
-3. **Agent uses tools** to manage tasks
-4. **Events fire** (optional) when tasks change
+### With Capability (Recommended)
 
 ```python
 from pydantic_ai import Agent
-from pydantic_ai_todo import create_todo_toolset, TodoStorage
+from pydantic_ai_todo import TodoCapability, TodoStorage
 
-# 1. Create storage and toolset
 storage = TodoStorage()
-toolset = create_todo_toolset(storage=storage)
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability(storage=storage)])
 
-# 2. Add to agent
-agent = Agent("openai:gpt-4o", toolsets=[toolset])
-
-# 3. Agent manages tasks
 result = await agent.run("Plan the project")
 
-# 4. Access tasks
 for todo in storage.todos:
     print(f"[{todo.status}] {todo.content}")
 ```
 
+### With Toolset
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai_todo import create_todo_toolset, get_todo_system_prompt, TodoStorage
+
+storage = TodoStorage()
+toolset = create_todo_toolset(storage=storage)
+
+agent = Agent(
+    "openai:gpt-4.1",
+    toolsets=[toolset],
+    system_prompt=get_todo_system_prompt(storage),
+)
+
+result = await agent.run("Plan the project")
+```
+
 ## Next Steps
 
-- [Toolset](toolset.md) — Learn about available tools
+- [Capability](capability.md) — Recommended integration
+- [Toolset](toolset.md) — Lower-level API
 - [Storage](storage.md) — Choose the right backend
 - [Types](types.md) — Understand the data models

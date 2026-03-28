@@ -26,20 +26,34 @@ Think of it as giving your AI agent a todo list — so it can break down complex
 
 4. **Persistent Storage**: PostgreSQL backend with session-based multi-tenancy. Production-ready.
 
-## Hello World Example
+## Quick Start (Capability API)
+
+The recommended way to add todo support — one import, one line:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai_todo import TodoCapability
+
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability()])
+result = await agent.run("Create a todo list for building a REST API")
+```
+
+`TodoCapability` automatically registers all tools and injects a dynamic system
+prompt showing the current task state. No manual wiring needed.
+
+### Alternative: Toolset API
 
 ```python
 from pydantic_ai import Agent
 from pydantic_ai_todo import create_todo_toolset
 
-agent = Agent(
-    "openai:gpt-4o",
-    toolsets=[create_todo_toolset()],
-)
-
+agent = Agent("openai:gpt-4.1", toolsets=[create_todo_toolset()])
 result = await agent.run("Create a todo list for building a REST API")
-print(result.output)
 ```
+
+!!! note
+    With the toolset API you need to wire `get_todo_system_prompt()` into the
+    agent's instructions manually. `TodoCapability` handles this automatically.
 
 ## Core Features
 

@@ -444,7 +444,15 @@ def _create_sync_toolset(
             summary_parts.append(f"{counts['in_progress']} in progress")
             summary_parts.append(f"{counts['pending']} pending")
 
-            return result + f"\n\nSummary: {', '.join(summary_parts)}"
+            summary = f"\n\nSummary: {', '.join(summary_parts)}"
+
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                summary += (
+                    "\n\nAll tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
+
+            return result + summary
     else:
 
         @toolset.tool(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
@@ -469,6 +477,13 @@ def _create_sync_toolset(
                 f"{counts['in_progress']} in progress, "
                 f"{counts['pending']} pending"
             )
+
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                lines.append("")
+                lines.append(
+                    "All tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
 
             return "\n".join(lines)
 
@@ -789,7 +804,15 @@ def _create_async_toolset(
             summary_parts.append(f"{counts['in_progress']} in progress")
             summary_parts.append(f"{counts['pending']} pending")
 
-            return result + f"\n\nSummary: {', '.join(summary_parts)}"
+            summary = f"\n\nSummary: {', '.join(summary_parts)}"
+
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                summary += (
+                    "\n\nAll tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
+
+            return result + summary
     else:
 
         @toolset.tool(description=_descs.get("read_todos", READ_TODO_DESCRIPTION))
@@ -815,6 +838,13 @@ def _create_async_toolset(
                 f"{counts['in_progress']} in progress, "
                 f"{counts['pending']} pending"
             )
+
+            if counts["pending"] == 0 and counts["in_progress"] == 0 and counts["completed"] > 0:
+                lines.append("")
+                lines.append(
+                    "All tasks are completed. "
+                    "Do NOT call read_todos again — respond to the user with a summary instead."
+                )
 
             return "\n".join(lines)
 

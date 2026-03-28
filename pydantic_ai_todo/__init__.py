@@ -21,6 +21,7 @@ Example:
 
 from importlib.metadata import version
 
+from pydantic_ai_todo.capability import TodoCapability
 from pydantic_ai_todo.events import TodoEvent, TodoEventEmitter, TodoEventType
 from pydantic_ai_todo.storage import (
     AsyncMemoryStorage,
@@ -47,6 +48,8 @@ from pydantic_ai_todo.toolset import (
 from pydantic_ai_todo.types import Todo, TodoItem
 
 __all__ = [
+    # Capability (recommended)
+    "TodoCapability",
     # Main factory
     "create_todo_toolset",
     "get_todo_system_prompt",

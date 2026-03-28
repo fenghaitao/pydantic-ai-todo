@@ -1889,3 +1889,68 @@ class TestAsyncSubtasksToolset:
         result = await update_status.function(todo_id="task1", status="invalid")  # type: ignore[call-arg]
 
         assert "Invalid status" in result
+
+
+class TestReadTodosAllCompletedHint:
+    """Tests for the 'all completed' hint in read_todos output."""
+
+    async def test_sync_all_completed_shows_hint(self):
+        """Sync read_todos shows 'Do NOT call' hint when all tasks completed."""
+        storage = TodoStorage()
+        toolset = create_todo_toolset(storage=storage)
+
+        storage._todos = [
+            TodoItem(id="1", content="Done", status="completed", active_form="Done"),
+        ]
+        read = toolset.tools["read_todos"]
+        result = await read.function()
+        assert "Do NOT call read_todos again" in result
+
+    async def test_sync_not_all_completed_no_hint(self):
+        """Sync read_todos does NOT show hint when tasks are pending."""
+        storage = TodoStorage()
+        toolset = create_todo_toolset(storage=storage)
+
+        storage._todos = [
+            TodoItem(id="1", content="Done", status="completed", active_form="Done"),
+            TodoItem(id="2", content="Todo", status="pending", active_form="Doing"),
+        ]
+        read = toolset.tools["read_todos"]
+        result = await read.function()
+        assert "Do NOT call read_todos again" not in result
+
+    async def test_sync_subtasks_all_completed_shows_hint(self):
+        """Sync subtask-enabled read_todos shows hint when all completed."""
+        storage = TodoStorage()
+        toolset = create_todo_toolset(storage=storage, enable_subtasks=True)
+
+        storage._todos = [
+            TodoItem(id="1", content="Done", status="completed", active_form="Done"),
+        ]
+        read = toolset.tools["read_todos"]
+        result = await read.function()
+        assert "Do NOT call read_todos again" in result
+
+    async def test_async_all_completed_shows_hint(self):
+        """Async read_todos shows hint when all completed."""
+        storage = AsyncMemoryStorage()
+        toolset = create_todo_toolset(async_storage=storage)
+
+        todo = Todo(id="1", content="Done", status="completed", active_form="Done")
+        await storage.add_todo(todo)
+
+        read = toolset.tools["read_todos"]
+        result = await read.function()
+        assert "Do NOT call read_todos again" in result
+
+    async def test_async_subtasks_all_completed_shows_hint(self):
+        """Async subtask-enabled read_todos shows hint when all completed."""
+        storage = AsyncMemoryStorage()
+        toolset = create_todo_toolset(async_storage=storage, enable_subtasks=True)
+
+        todo = Todo(id="1", content="Done", status="completed", active_form="Done")
+        await storage.add_todo(todo)
+
+        read = toolset.tools["read_todos"]
+        result = await read.function()
+        assert "Do NOT call read_todos again" in result

@@ -13,6 +13,8 @@
 </p>
 
 <p align="center">
+  <b>Capabilities API</b> — plug-and-play with one line
+  &nbsp;&bull;&nbsp;
   <b>Subtasks & Dependencies</b> — hierarchical task management
   &nbsp;&bull;&nbsp;
   <b>PostgreSQL Storage</b> — persistent multi-tenant tasks
@@ -26,15 +28,62 @@
 
 > **Full framework?** Check out [Pydantic Deep Agents](https://github.com/vstorm-co/pydantic-deepagents) — complete agent framework with planning, filesystem, subagents, and skills.
 
-## Use Cases
+## Quick Start
 
-| What You Want to Build | How Todo Toolset Helps |
-|------------------------|------------------------|
-| **AI Coding Assistant** | Break down complex features into trackable tasks |
-| **Project Manager Bot** | Create hierarchical task structures with dependencies |
-| **Research Agent** | Track investigation progress across multiple topics |
-| **Workflow Automation** | React to task completion with webhooks and callbacks |
-| **Multi-User App** | Session-based PostgreSQL storage for each user |
+The recommended way to add todo support is via the **Capabilities API** — one import, one line:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai_todo import TodoCapability
+
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability()])
+result = await agent.run("Create a todo list for building a REST API")
+```
+
+`TodoCapability` automatically:
+- Registers all todo tools (`add_todo`, `read_todos`, `write_todos`, `update_todo_status`, `remove_todo`)
+- Injects dynamic system prompt showing current task state
+- Creates in-memory storage (or use your own)
+
+### With Storage Access
+
+```python
+from pydantic_ai_todo import TodoCapability, TodoStorage
+
+storage = TodoStorage()
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability(storage=storage)])
+
+result = await agent.run("Plan a blog application")
+
+# Access todos directly
+for todo in storage.todos:
+    print(f"[{todo.status}] {todo.content}")
+```
+
+### With Subtasks and Dependencies
+
+```python
+agent = Agent(
+    "openai:gpt-4.1",
+    capabilities=[TodoCapability(enable_subtasks=True)],
+)
+```
+
+Enables `add_subtask`, `set_dependency`, and `get_available_tasks` tools with automatic cycle detection.
+
+### YAML Agent Definition
+
+```yaml
+model: openai:gpt-4.1
+instructions: "You are a project planner."
+capabilities:
+  - TodoCapability:
+      enable_subtasks: true
+```
+
+```python
+agent = Agent.from_file("agent.yaml")
+```
 
 ## Installation
 
@@ -48,26 +97,25 @@ Or with uv:
 uv add pydantic-ai-todo
 ```
 
-## Quick Start
+## Alternative: Toolset API
+
+If you prefer the lower-level toolset approach (without capabilities):
 
 ```python
 from pydantic_ai import Agent
-from pydantic_ai_todo import create_todo_toolset
+from pydantic_ai_todo import create_todo_toolset, get_todo_system_prompt, TodoStorage
+
+storage = TodoStorage()
+toolset = create_todo_toolset(storage=storage)
 
 agent = Agent(
-    "openai:gpt-4o",
-    toolsets=[create_todo_toolset()],
+    "openai:gpt-4.1",
+    toolsets=[toolset],
+    system_prompt=get_todo_system_prompt(storage),
 )
-
-result = await agent.run("Create a todo list for building a REST API")
 ```
 
-**That's it.** Your agent can now:
-
-- ✅ **Create tasks** — `add_todo`, `write_todos`
-- ✅ **Track progress** — `read_todos`, `update_todo_status`
-- ✅ **Manage hierarchy** — subtasks and dependencies
-- ✅ **Persist state** — PostgreSQL multi-tenant storage
+> **Note:** With the toolset API, you need to wire `get_todo_system_prompt()` manually. `TodoCapability` handles this automatically.
 
 ## Available Tools
 
@@ -89,32 +137,25 @@ result = await agent.run("Create a todo list for building a REST API")
 ### In-Memory (Default)
 
 ```python
-from pydantic_ai_todo import create_todo_toolset, TodoStorage
+from pydantic_ai_todo import TodoCapability, TodoStorage
 
 storage = TodoStorage()
-toolset = create_todo_toolset(storage=storage)
-
-# Access todos directly after agent runs
-for todo in storage.todos:
-    print(f"[{todo.status}] {todo.content}")
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability(storage=storage)])
 ```
 
 ### Async Memory
 
 ```python
-from pydantic_ai_todo import create_todo_toolset, AsyncMemoryStorage
+from pydantic_ai_todo import TodoCapability, AsyncMemoryStorage
 
 storage = AsyncMemoryStorage()
-toolset = create_todo_toolset(async_storage=storage)
-
-# Async access
-todos = await storage.get_todos()
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability(async_storage=storage)])
 ```
 
 ### PostgreSQL
 
 ```python
-from pydantic_ai_todo import create_storage, create_todo_toolset
+from pydantic_ai_todo import TodoCapability, create_storage
 
 storage = create_storage(
     "postgres",
@@ -123,71 +164,43 @@ storage = create_storage(
 )
 await storage.initialize()
 
-toolset = create_todo_toolset(async_storage=storage)
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability(async_storage=storage)])
 ```
-
-## Task Hierarchy
-
-Enable subtasks for complex task management:
-
-```python
-toolset = create_todo_toolset(
-    async_storage=storage,
-    enable_subtasks=True,
-)
-
-# Agent can now:
-# - add_subtask(parent_id, content) — create child tasks
-# - set_dependency(task_id, depends_on_id) — link tasks
-# - get_available_tasks() — list tasks ready to work on
-```
-
-Dependencies include automatic cycle detection — no infinite loops possible.
 
 ## Event System
 
 React to task changes:
 
 ```python
-from pydantic_ai_todo import TodoEventEmitter, AsyncMemoryStorage
+from pydantic_ai_todo import TodoCapability, TodoEventEmitter, AsyncMemoryStorage
 
 emitter = TodoEventEmitter()
 
 @emitter.on_completed
 async def notify_completed(event):
     print(f"Task done: {event.todo.content}")
-    # Send webhook, update UI, etc.
 
 @emitter.on_created
 async def notify_created(event):
     print(f"New task: {event.todo.content}")
 
 storage = AsyncMemoryStorage(event_emitter=emitter)
-toolset = create_todo_toolset(async_storage=storage)
+agent = Agent("openai:gpt-4.1", capabilities=[TodoCapability(async_storage=storage)])
 ```
-
-## Custom Tool Descriptions
-
-Override default tool descriptions for better LLM behavior in your use case:
-
-```python
-toolset = create_todo_toolset(
-    descriptions={
-        "write_todos": "Plan and organize complex multi-step tasks only",
-        "read_todos": "Check current task list and progress",
-    }
-)
-```
-
-Pass a `descriptions` dict mapping tool names to custom description strings. Any tool not listed keeps its default description. Available tool names: `read_todos`, `write_todos`, `add_todo`, `update_todo_status`, `remove_todo`, `add_subtask`, `set_dependency`, `get_available_tasks`.
 
 ## API Reference
+
+### Capability
+
+| Class | Description |
+|-------|-------------|
+| `TodoCapability` | Pydantic AI capability — recommended way to add todo support |
 
 ### Factory Functions
 
 | Function | Description |
 |----------|-------------|
-| `create_todo_toolset()` | Create toolset with todo tools |
+| `create_todo_toolset()` | Create standalone toolset (lower-level API) |
 | `create_storage(backend, **options)` | Factory for storage backends |
 | `get_todo_system_prompt()` | Generate system prompt with current todos |
 
